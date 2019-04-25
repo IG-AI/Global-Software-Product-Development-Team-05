@@ -12,9 +12,9 @@
     <div id="gridLayout"></div>
 
     <button id="orderButton" onClick="orderRobot()" disabled>Order to place package</button>
-
-    <br/>
+    <button id="refreshButton" onClick="renderGridLayout()">Manually refresh layout</button>
     <button id="streamButton" onClick="startStream()">Start stream</button>
+
     <br/>
     <br/>
     <iframe id="stream" type="text/html"
@@ -24,7 +24,6 @@
     </iframe>
 
   <script>
-    let layoutArray = getCurrentGridLayout();
     let gridDim = getGridDimension();
     let rows = gridDim[0];
     let columns = gridDim[1];
@@ -34,26 +33,40 @@
 
     // Rendering the grid layout
     $(document).ready(function() {
-      var myElement = $("#gridLayout");
+      renderGridLayout();
+    });
+
+    function renderGridLayout() {
+      let layoutArray = getCurrentGridLayout();
+      var layoutIndexCounter = 0;
+
+      // Reset the rendering of the grid layout
       var gridLayout = $('#gridLayout');
-      var layoutCounter = 0;
+      gridLayout.replaceWith('<div id="gridLayout"></div>');
+      gridLayout = $('#gridLayout');
+
       for (var row = 0; row < rows; row++) {
           for (var column = 0; column < columns; column++) {
           gridLayout.append(`
             <input onClick="selectGridPos(this.id)"
                    name="gridPos"
-                   class="gridPos ${layoutArray[layoutCounter]}"
+                   class="gridPos ${layoutArray[layoutIndexCounter]}"
                    type="button"
                    id="gridPos${row}${column}"
             />
             `);
-          layoutCounter += 1;
+          layoutIndexCounter += 1;
           }
         gridLayout.append('<br/>');
       }
-    });
+
+      selectGridPos(selectedGridPos);
+    }
 
     function selectGridPos(gridPosID) {
+      if (!gridPosID) {
+        return;
+      }
       var selGridPos = document.getElementById(gridPosID);
       var alreadySelected = selGridPos.classList.contains("selectedGridPos");
 
@@ -109,6 +122,11 @@
       // TODO: Send API call to get info about the current layout of the grid
       return ['robot with right', 'empty', 'empty', 'empty', 'package', 'package'];
     }
+
+    // Rerenders current grid layout every 5 seconds
+    setInterval(function() {
+      renderGridLayout();
+    }, 5000);
 
   </script>
   </body>
