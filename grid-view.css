@@ -1,0 +1,53 @@
+.gridPos {
+  border-style: solid;
+  border-color: black;
+  padding: 0;
+  margin: 0;
+  width: 75px;
+  height: 75px;
+  color: black;
+  outline: none;
+  background-repeat: no-repeat;
+  background-position-x: center;
+  background-position-y: center;
+}
+
+.selectedGridPos {
+  border-color: red;
+  border-width: 3px;
+}
+
+.robot.with {
+  background-image: url('images/robot-with.png');
+  background-size: 40px;
+}
+
+.robot.without {
+  background-image: url('images/robot-with.png');
+  background-size: 40px;
+}
+
+.robot.up {
+  transform: rotate(0deg);
+}
+
+.robot.down {
+  transform: rotate(180deg);
+}
+
+.robot.right {
+  transform: rotate(90deg);
+}
+
+.robot.left {
+  transform: rotate(270deg);
+}
+
+.package {
+  background-image: url('images/package.png');
+  background-size: 60px;
+}
+
+.empty {
+  background-color: white;
+}

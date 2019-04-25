@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>GSPD</title>
+    <link rel="stylesheet" href="grid-view.css" type="text/css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.3.1/jquery.min.js"></script>
+  </head>
+  <body>
+    <h1>Global Software Product Development Team 05</h1>
+
+    <div id="gridLayout"></div>
+
+    <button id="orderButton" onClick="orderRobot()" disabled>Order to place package</button>
+
+    <br/>
+    <button id="streamButton" onClick="startStream()">Start stream</button>
+    <br/>
+    <br/>
+    <iframe id="stream" type="text/html"
+      width="320"
+      height="193"
+      frameborder="0">
+    </iframe>
+
+  <script>
+    let layoutArray = getCurrentGridLayout();
+    let gridDim = getGridDimension();
+    let rows = gridDim[0];
+    let columns = gridDim[1];
+
+    let selectedGridPos;
+    let streamOn = false;
+
+    // Rendering the grid layout
+    $(document).ready(function() {
+      var myElement = $("#gridLayout");
+      var gridLayout = $('#gridLayout');
+      var layoutCounter = 0;
+      for (var row = 0; row < rows; row++) {
+          for (var column = 0; column < columns; column++) {
+          gridLayout.append(`
+            <input onClick="selectGridPos(this.id)"
+                   name="gridPos"
+                   class="gridPos ${layoutArray[layoutCounter]}"
+                   type="button"
+                   id="gridPos${row}${column}"
+            />
+            `);
+          layoutCounter += 1;
+          }
+        gridLayout.append('<br/>');
+      }
+    });
+
+    function selectGridPos(gridPosID) {
+      var selGridPos = document.getElementById(gridPosID);
+      var alreadySelected = selGridPos.classList.contains("selectedGridPos");
+
+      var allGridPos = document.getElementsByName('gridPos');
+      for (var i = 0; i < allGridPos.length; i++) {
+        allGridPos[i].classList.remove("selectedGridPos");
+      }
+
+      var orderButton = document.getElementById("orderButton");
+      if(!alreadySelected){
+        orderButton.disabled = false;
+        selGridPos.classList.add("selectedGridPos");
+        selectedGridPos = gridPosID;
+      } else {
+        orderButton.disabled = true;
+        selectedGridPos = undefined;
+      }
+    }
+
+    function startStream() {
+      streamOn = !streamOn;
+      var streamButton = document.getElementById("streamButton");
+      var stream = document.getElementById("stream");
+
+      if (streamOn) {
+        streamButton.innerText = "Stop stream";
+
+        stream.src = getStreamURL();
+      } else {
+        streamButton.innerText = "Start stream";
+        stream.src = "";
+      }
+    }
+
+    function orderRobot() {
+      // TODO: Send API call to server to order changed drop off location
+      console.log("Ordering robot to drop off package at", selectedGridPos);
+    }
+
+    function getStreamURL() {
+      // TODO: Send API call to fetch real streaming URL
+      return "http://www.youtube.com/embed/hZtC9oQoHfY";
+    }
+
+    function getGridDimension() {
+      // TODO: Send API call to fetch real grid dimension of storage environment
+      let rows = 3;
+      let columns = 2;
+      return [rows, columns];
+    }
+
+    function getCurrentGridLayout() {
+      // TODO: Send API call to get info about the current layout of the grid
+      return ['robot with right', 'empty', 'empty', 'empty', 'package', 'package'];
+    }
+
+  </script>
+  </body>
+</html>
