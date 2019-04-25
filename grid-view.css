@@ -7,6 +7,7 @@
   height: 75px;
   color: black;
   outline: none;
+  background-color: white;
   background-repeat: no-repeat;
   background-position-x: center;
   background-position-y: center;
@@ -46,8 +47,4 @@
 .package {
   background-image: url('images/package.png');
   background-size: 60px;
-}
-
-.empty {
-  background-color: white;
 }
