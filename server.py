@@ -1,44 +1,75 @@
-import socket, traceback
-from robot import Robot
+from queue import Queue
+import socket, pickle, _thread, random
+
 
 class Server:
-    def __init__(self, ip='127.0.0.1', port=2727, path='None'):
-        self.ip = ip
-        self.port = port
+    def __init__(self, host=socket.gethostbyname(socket.gethostname()), port=2727):
+        self.RUN = True
+        self.HOST = host
+        self.PORT = port
+        self.robot = None
+        self.clients = []
+        self.numClients = len(self.clients)
+        self.commendsQueue = Queue()
 
-        self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.server.bind((self.ip, self.port))
+        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.socket.bind((self.HOST, self.PORT))
+        self.socket.listen()
+        print("Server has started on IP: " + str(host) + " and port: " + str(port))
 
-        self.robot = Robot(path)
+
+    def __del__(self):
+        self.disconnect()
 
     def connect(self):
-        def listen(robot, channel):
-            run = True
+        print("Starts listing to clients...")
+        while self.RUN:
+            clientsocket, address = self.socket.accept()
             try:
-                while run:
-                    data = channel.recv(1024)
-                    if not data:
-                        break
-                    code = data[0]
-                    if (code == '\x00') | (code == '\x01') | (code == '\x02'):
-                        robot.socket.send(data)
-                        reply = robot.socket.recv()
-                        channel.send(reply)
-                    elif (code == '\x80') | (code == '\x81'):
-                        robot.socket.send(data)
-                    elif code == '\x98':
-                        channel.send(robot.socket.type)
-                    elif code == '\x99':
-                        run = False
+                temp = pickle.loads(clientsocket.recv(4096))
+                print(temp)
             except:
-                traceback.print_exc()
-            finally:
-                channel.close()
+                raise Exception("Failed to receive the client type!")
+            try:
+                if temp == 'robot':
+                    print("Connecting to the robot...")
+                    _thread.start_new_thread(self._listenRobot, (clientsocket,))
+                else:
+                    self.clients.append(temp)
+                    self.numClients = len(self.clients)
+                    print("Connecting to the " + str(self.numClients) + " client at: " + str(clientsocket.gethostbyname(clientsocket.gethostname())))
+                    _thread.start_new_thread(self._listenClient, (clientsocket,))
+            except:
+                raise Exception("Failed to establish new connection!")
 
-        self.server.listen(1)
-        while True:
-            channel, details = self.server.accept()
-            listen(self.robot, channel)
+    def disconnect(self):
+        print("Server closing down...")
+        self.robot.socket.send(pickle.dumps("end"))
+        for i in range(self.numClients):
+            self.clients[i].socket.send(pickle.dumps("end"))
+        self.RUN = False
 
+    def updateCommends(self, commend):
+        self.commendsQueue.put(commend)
+
+    def createCommends(self):
+        commend = str(random.randint(1, 4) * 4)
+        self.commendsQueue.put(commend)
+
+    def _listenRobot(self, robot):
+        while self.RUN:
+            if self.commendsQueue.qsize() <= 0:
+                self.createCommends()
+
+            qsize = self.commendsQueue.qsize()
+            for i in range(qsize):
+                robot.sendall(pickle.dumps(self.commendsQueue.get()))
+
+    def _listenClient(self, clientsocket):
+        while self.RUN:
+            self.updateCommends(pickle.loads(clientsocket.socket.recv(4096)))
+            
 if __name__ == "__main__":
-    Server()
+    server = Server()
+    server.connect()
+
