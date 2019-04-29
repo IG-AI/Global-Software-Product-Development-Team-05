@@ -1,7 +1,7 @@
 import socket, pickle
 
 class Robot:
-    def __init__(self, host='127.0.1.1', port=2727):
+    def __init__(self, host='127.0.1.1', port=2627):
         self.SERVER_HOST = host
         self.SERVER_PORT = port
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -20,15 +20,16 @@ class Robot:
             except:
                 raise Exception("The robot couldn't connect to the server!")
 
+            print("Starts executing robot...")
             while run:
                 temp = pickle.loads(self.socket.recv(4096))
-                if temp == 'end':
+                if temp == "end":
                     print("Robot disconnecting...")
                     run = False
                     self.disconnect()
                     self.socket.close()
-                    exit()
-                self.commends.append(temp)
+                else:
+                    self.commends.append(temp)
 
     def disconnect(self):
         self.socket.close()
