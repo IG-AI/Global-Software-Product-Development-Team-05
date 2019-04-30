@@ -1,6 +1,6 @@
 <?php
 $password = $_POST['password'];
-$password=md5($password);
+$password = md5($password);
 $email = $_POST['email'];
 $firstname = $_POST['firstname'];
 $lastname = $_POST['lastname'];
@@ -31,10 +31,9 @@ if (!empty($password) || !empty($email)) {
         if ($rnum == 0) {
             $stmt->close();
             $stmt = $conn->prepare($INSERT);
-            $stmt->bind_param("ssss", $email, $password, $firstname, $lastname);
+            $stmt->bind_param("ssss", $email, $firstname, $lastname, $password);
             $stmt->execute();
-            echo file_get_contents("../Login/Login.html");
-;
+            header("Location:../login/index.php");
         } else {
             echo "Someone already register using this email";
         }
