@@ -39,7 +39,7 @@ class Server:
                     self.numClients = len(self.clients)
                     print("Connecting to a client...")
                     _thread.start_new_thread(self._listenClient, (clientsocket,))
-                    print("Connected to the " + str(self.numClients) + " client at: " + str(clientsocket.gethostbyname(clientsocket.gethostname())))
+                    print("Connected to the " + str(self.numClients) + " client at: " + str(address))
                 elif temp == 'camera':
                     print("Connecting to the camera...")
                     _thread.start_new_thread(self._listenCamera, (clientsocket,))
@@ -55,17 +55,17 @@ class Server:
         sleep(1)
         self.socket.close()
 
-    def updateCommends(self, commend):
+    def _updateCommends(self, commend):
         self.commendsQueue.put(commend)
 
-    def createCommends(self):
+    def _createCommends(self):
         commend = str(random.randint(1, 4) * 4)
         self.commendsQueue.put(commend)
 
     def _listenRobot(self, robotsocket):
         while self.RUN:
             if self.commendsQueue.qsize() <= 0:
-                self.createCommends()
+                self._createCommends()
 
             for i in range(self.commendsQueue.qsize()):
                 robotsocket.sendall(pickle.dumps(self.commendsQueue.get()))
@@ -74,7 +74,7 @@ class Server:
 
     def _listenClient(self, clientsocket):
         while self.RUN:
-            self.updateCommends(pickle.loads(clientsocket.recv(4096)))
+            self._updateCommends(pickle.loads(clientsocket.recv(4096)))
 
         clientsocket.sendall(pickle.dumps("end"))
 
