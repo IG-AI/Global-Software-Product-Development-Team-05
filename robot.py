@@ -22,14 +22,14 @@ class Robot:
 
             print("Starts executing robot...")
             while run:
-                temp = pickle.loads(self.socket.recv(4096))
-                if temp == "end":
+                data = pickle.loads(self.socket.recv(4096))
+                if data == "end":
                     print("Robot disconnecting...")
                     run = False
                     self.disconnect()
                     self.socket.close()
                 else:
-                    self.commends.append(temp)
+                    self.commends.append(data)
 
     def disconnect(self):
         self.socket.close()
