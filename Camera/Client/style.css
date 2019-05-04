@@ -1,0 +1,114 @@
+.title-camera {
+    margin: 10px 5px;
+    font-weight: bold;
+    font-family: Arial, Helvetica, sans-serif;
+    display: flex
+}
+
+.tags-input {
+    border: 2px solid #a1a1a1;
+    border-radius: 40px;
+    height: 40px;
+    padding: 0 11px;
+    font-size: 14px;
+    display: flex;
+    align-items: center;
+    overflow: hidden;
+    color: rgb(105, 105, 105);
+}
+
+.tags-input span {
+    background: #bbb;
+    margin-right: 7px;
+    color: #fff;
+    padding: 4px 7px;
+    border-radius: 20px;
+}
+
+.tags-input span[data-selected] {
+    background: #51deeb;
+}
+
+.tags-input::placeholder {
+    color: rgb(212, 212, 212);
+}
+
+.tags-input::after {
+    content: "";
+    background: #888;
+    width: 1px;
+    height: 19px;
+    margin: -1px 0 0 -1px;
+    display: none;
+    -webkit-animation: blink 1s infinite alternate;
+    animation: blink 1s infinite alternate;
+}
+
+.tags-input:focus {
+    border-color: #53d5e0;
+    outline: none;
+}
+
+.tags-input:focus[data-cursor]::after {
+    display: block;
+}
+
+@media screen and (max-width: 736px) {
+    .tags-input:focus[data-cursor]::after {
+        display: none;
+    }
+}
+
+.tags-input:focus+h1 {
+    color: #71ccd5;
+}
+
+.tags-input:focus+h1 span {
+    border-color: #71ccd5;
+}
+
+.button-get-video {
+	background-color:#44c767;
+	-moz-border-radius:15px;
+	-webkit-border-radius:28px;
+	border-radius:28px;
+	border:1px solid #44c767;
+	display:inline-block;
+	cursor:pointer;
+	color:#ffffff;
+	font-family:Arial;
+	font-size:14px;
+	padding:12px 15px;
+	text-decoration:none;
+	text-shadow:0px 1px 0px #2f6627;
+}
+.button-get-video:hover {
+	background-color:#5cbf2a;
+}
+.button-get-video:active {
+	position:relative;
+	top:1px;
+}
+
+.button-stop-video {
+	background-color:#808080;
+	-moz-border-radius:15px;
+	-webkit-border-radius:28px;
+	border-radius:28px;
+	border:1px solid #808080;
+	display:inline-block;
+	cursor:pointer;
+	color:#ffffff;
+	font-family:Arial;
+	font-size:14px;
+	padding:12px 15px;
+	text-decoration:none;
+	text-shadow:0px 1px 0px #2f6627;
+}
+.button-stop-video:hover {
+	background-color:#424242;
+}
+.button-stop-video:active {
+	position:relative;
+	top:1px;
+}
