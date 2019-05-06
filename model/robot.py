@@ -1,4 +1,4 @@
-from sqlalchemy import create_engine, MetaData, Table, Column, Integer, String, Boolean, join, select
+from db import DB
 from model.base import Base
 #from models.job import Job
 
@@ -6,15 +6,14 @@ from model.base import Base
 class Robot(Base):
     __tablename__ = 'robot'
 
-    robot_id = Column(Integer, primary_key=True)
-    role = Column(Boolean)
-    current_location_x = Column(Integer)
-    current_location_y = Column(Integer)
-    current_direction = Column(String(20))
-    #jobs = db.relationship('Job', backref='robot', lazy='dynamic')
+    id = DB.Column(DB.Integer, primary_key=True)
+    role = DB.Column(DB.Boolean)
+    current_location_x = DB.Column(DB.Integer)
+    current_location_y = DB.Column(DB.Integer)
+    current_direction = DB.Column(DB.String(20))
 
     def __init__(self, id, role, current_location_x, current_location_y, current_direction):
-        self.robot_id = id
+        self.id = id
         self.role = role
         self.current_location_x = current_location_x
         self.current_location_y = current_location_y
@@ -23,7 +22,7 @@ class Robot(Base):
     @property
     def serialize(self):
         return {
-            'robot_id': self.robot_id,
+            'id': self.id,
             'current_location_x': self.current_location_x,
             'current_location_y': self.current_location_y,
             'current_direction': self.current_direction
@@ -49,6 +48,6 @@ class Robot(Base):
             return 1
 
     @classmethod
-    def find_by_id(cls, robot_id):
-        packet = cls.query().filter_by(cls.robot_id == robot_id).first()
+    def find_by_id(cls, id):
+        packet = cls.query.filter_by(id = id).first()
         return packet

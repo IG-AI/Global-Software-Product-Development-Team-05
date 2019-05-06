@@ -1,14 +1,14 @@
-from sqlalchemy import Column, Integer, String, Date, Boolean
+from db import DB
 from model.base import Base
 #from models.job import Job
 
 class Account(Base):
-    __tablename__ = 'robot'
+    __tablename__ = 'account'
 
-    account_id = Column(Integer, primary_key=True)
-    role = Column(Boolean)
-    username = Column(String(20))
-    password = Column(String(20))
+    id = DB.Column(DB.Integer, primary_key=True)
+    role = DB.Column(DB.Boolean)
+    username = DB.Column(DB.String(20))
+    password = DB.Column(DB.String(20))
     #current_direction = db.Column(db.String(20))
     #jobs = db.relationship('Job', backref='robot', lazy='dynamic')
 
@@ -21,13 +21,18 @@ class Account(Base):
     @property
     def serialize(self):
         return {
-            'account_id': self.account_id,
+            'id': self.id,
             'role': self.role,
             'username': self.username,
             'password': self.password           
         }
 
     @classmethod
-    def find_by_id(cls, account_id):
-        packet = cls.query().filter_by(cls.account_id == account_id).first()
+    def find_by_id(cls, id):
+        packet = cls.query.filter_by(id = id).first()
+        return packet
+
+    @classmethod
+    def find(cls, username, password):
+        packet = cls.query.filter_by(username = username, password = password).first()
         return packet

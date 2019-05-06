@@ -1,24 +1,13 @@
-import db
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
-from db import session_scope as s
+from db import DB
 
-#Base = declarative_base()
-
-class Base():
+class Base(DB.Model):
     __abstract__ = True
 
     def save_to_db(self):
-        s.add(self)
-        s.commit()
+        DB.session.add(self)
+        DB.session.commit()
 
     def delete_from_db(self):
-        s.delete(self)
-        s.commit()
+        DB.session.delete(self)
+        DB.session.commit()
 
-    @classmethod
-    def query(cls):
-        return s.query(cls)
-
-        #def filter_by(*kwargs):
-            #kwargskwargskwargss.query(cls).filter_by(*kwargs)
