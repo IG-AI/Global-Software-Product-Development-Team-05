@@ -1,7 +1,7 @@
 import socket, pickle
 
 class Camera:
-    def __init__(self, host='127.0.1.1', port=2627):
+    def __init__(self, host='127.0.1.1', port=2526):
         self.SERVER_HOST = host
         self.SERVER_PORT = port
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
