@@ -3,7 +3,46 @@ from time import sleep
 import socket, pickle, _thread, random
 
 class Server:
+    """
+    A class which acts as a server. It connects and handles data between clients, robots and a camera.
+
+    Methods
+    -------
+    connect(self)
+        Starts the server.
+    disconnect(self)
+        Stops the server.
+    """
     def __init__(self, host=socket.gethostbyname(socket.gethostname()), port=2526):
+        """
+        Initialize the server class, with a host and port as optional input.
+
+        Parameters
+        ----------
+        host(='127.0.1.1'): string
+            A string with the IP address for which the server should use.
+        port(=2526): int
+            A port number the server server should use.
+
+        Attributes
+        ----------
+        RUN: bool
+            If the server is running.
+        HOST : string
+            The servers host address.
+        PORT : int
+            The servers port number.
+        clients : list of strings
+            List with the connected clients IP addresses.
+        robots : list of strings
+            List with the connected robots IP addresses.
+        commendsQueue : Queue
+            Queue with manual commends to the robots.
+        videostream : Video Stream
+            The video stream from the camera.
+        socket : socket
+            The server socket.
+        """
         self.RUN = True
         self.HOST = host
         self.PORT = port
@@ -18,37 +57,61 @@ class Server:
         self.socket.listen()
 
     def __del__(self):
+        """
+        Disconnects the server if the server object is removed.
+        """
         self.disconnect()
 
     def connect(self):
+        """
+        Setting up the connection for the server class, with a new thread.
+
+        """
         _thread.start_new_thread(self._connect_aux, ())
         return
 
     def _connect_aux(self):
-        print("Server has started on IP: " + str(self.HOST) + " and port: " + str(self.PORT))
+        """
+        Aux function for the connection function, which starts new threads with new incoming connections.
+
+        Attributes
+        ----------
+        socket: socket
+            Socket for the connected component.
+        address : string
+            IP address for the connected component.
+        id : vary (string)
+            ID if the connection in the form of a string, which can have either the value of robot, client or camera.
+
+        Raises
+        ------
+        Exception
+            If the server can't receive the id, Exception is raised.
+        Exception
+            If the id isn't a string containing either robot, client or camera, Exception is raised.
+        """
+        print("Server has started on IP: " + self.HOST + " and port: " + str(self.PORT))
         print("Starts listing to clients...")
         while self.RUN:
-            clientsocket, address = self.socket.accept()
+            socket, address = self.socket.accept()
             try:
-                data = pickle.loads(clientsocket.recv(4096))
+                id = pickle.loads(socket.recv(4096))
             except:
                 raise Exception("Failed to receive the client type!")
             try:
-                if data == 'robot':
+                if id == 'robot':
                     print("Connecting to a robot at: " + str(address))
-                    self.robots.append(data)
-                    self.numRobots = len(self.robots)
-                    _thread.start_new_thread(self._listenRobot, (clientsocket,address))
+                    self.robots.append(str(address))
+                    _thread.start_new_thread(self._listenRobot, (socket,address))
                     print("Connected to the robot!")
-                elif data == 'client':
+                elif id == 'client':
                     print("Connecting to a client at: " + str(address))
-                    self.clients.append(data)
-                    self.numClients = len(self.clients)
-                    _thread.start_new_thread(self._listenClient, (clientsocket,address))
+                    self.clients.append(str(address))
+                    _thread.start_new_thread(self._listenClient, (socket,address))
                     print("Connected to a client!")
-                elif data == 'camera':
+                elif id == 'camera':
                     print("Connecting to the camera at: " + str(address))
-                    _thread.start_new_thread(self._listenCamera, (clientsocket,))
+                    _thread.start_new_thread(self._listenCamera, (socket,))
                     print("Connected to the camera!")
                 else:
                     print("Unknown device trying to connect!")
@@ -56,18 +119,44 @@ class Server:
                 raise Exception("Failed to establish new connection!")
 
     def disconnect(self):
+        """
+        Closing down the connection for the server class.
+        """
         print("Server closing down...")
         self.RUN = False
         self.socket.close()
 
     def _updateCommends(self, commend):
+        """
+        Updates the commend queue.
+
+        Parameters
+        ----------
+        commend: string
+            The commend should be put into the commends queue.
+        """
         self.commendsQueue.put(commend)
 
     def _createCommends(self):
+        """
+        Creates commends for the robots, if no client has sent a commend.
+        """
         commend = str(random.randint(1, 4) * 4)
         self.commendsQueue.put(commend)
 
     def _listenRobot(self, robotsocket, address):
+        """
+        Function for listing to a robot. It continues until either the server is shutting down or the current robot has
+        shut down.
+
+        Parameters
+        ----------
+        robotsocket: socket
+            The socket for the incoming robot connection.
+        address: Tuple of string and int
+            A tuple with the IP address of the robot in the form of a string and a port number to the robot in the form
+            of a int.
+        """
         while self.RUN:
             if self.commendsQueue.qsize() <= 0:
                 self._createCommends()
@@ -94,6 +183,18 @@ class Server:
         robotsocket.sendall(pickle.dumps("end"))
 
     def _listenClient(self, clientsocket, address):
+        """
+        Function for listing to a client. It continues until either the server is shutting down or the current client
+        has shut down.
+
+        Parameters
+        ----------
+        clientsocket: socket
+            The socket for the incoming client connection.
+        address: Tuple of string and int
+            A tuple with the IP address of the client in the form of a string and a port number to the client in the
+            form of a int.
+        """
         while self.RUN:
             try:
                 data = pickle.loads(clientsocket.recv(4096))
@@ -107,6 +208,18 @@ class Server:
         clientsocket.sendall(pickle.dumps("end"))
 
     def _listenCamera(self, camerasocket):
+        """
+        Function for listing to the camera. It continues until either the server is shutting down or the camera has
+        shut down.
+
+        Parameters
+        ----------
+        camerasocket: socket
+            The socket for the incoming camera connection.
+        address: Tuple of string and int
+            A tuple with the IP address of the camera in the form of a string and a port number to the camera in the
+            form of a int.
+        """
         while self.RUN:
             try:
                 self.videostream = pickle.loads(camerasocket.recv(4096))
