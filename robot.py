@@ -4,14 +4,14 @@ from time import sleep
 
 class Robot:
     """
-    A class which handles a LEGO robot. It can connect to a server and receive commends form the server.
+    A class which handles a LEGO robot. It can connect to a server and receive commands form the server.
 
     Methods
     -------
     connect(self)
         Connects the robot to the server.
-    recv(self, commend):
-        Tries to receive a commend form the server.
+    recv(self, command):
+        Tries to receive a command form the server.
     disconnect(self)
         Disconnects the robot to the server.
     """
@@ -34,13 +34,13 @@ class Robot:
             The servers port number.
         socket : socket
             The robot socket.
-        commendsQueue : Queue
-            A queue with commends for the robot.
+        commandsQueue : Queue
+            A queue with commands for the robot.
         """
         self.SERVER_HOST = host
         self.SERVER_PORT = port
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.commendsQueue = Queue()
+        self.commandsQueue = Queue()
 
     def __del__(self):
         """
@@ -68,18 +68,18 @@ class Robot:
 
     def recv(self):
         """
-        Tries to receive a commend form the server.
+        Tries to receive a command form the server.
         """
         try:
-            print("Trying to receive new commend from server...")
+            print("Trying to receive a new command from server...")
             data = pickle.loads(self.socket.recv(4096))
             if data == "end":
                 self.RUN = False
                 self.disconnect()
                 return
             else:
-                print("Successfully received a commend from the server! (" + str(data) + ")")
-                self.commendsQueue.put(data)
+                print("Successfully received a command from the server! (" + str(data) + ")")
+                self.commandsQueue.put(data)
                 return
         except:
             pass

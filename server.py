@@ -36,8 +36,8 @@ class Server:
             List with the connected clients IP addresses.
         robots : list of strings
             List with the connected robots IP addresses.
-        commendsQueue : Queue
-            Queue with manual commends to the robots.
+        commandsQueue : Queue
+            Queue with manual commands to the robots.
         videostream : Video Stream
             The video stream from the camera.
         socket : socket
@@ -49,7 +49,7 @@ class Server:
 
         self.clients = []
         self.robots = []
-        self.commendsQueue = Queue()
+        self.commandsQueue = Queue()
         self.videostream = None
 
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -65,7 +65,6 @@ class Server:
     def connect(self):
         """
         Setting up the connection for the server class, with a new thread.
-
         """
         _thread.start_new_thread(self._connect_aux, ())
         return
@@ -126,23 +125,23 @@ class Server:
         self.RUN = False
         self.socket.close()
 
-    def _updateCommends(self, commend):
+    def _updateCommands(self, command):
         """
-        Updates the commend queue.
+        Updates the commands queue.
 
         Parameters
         ----------
-        commend: string
-            The commend should be put into the commends queue.
+        command: string
+            The command should be put into the commands queue.
         """
-        self.commendsQueue.put(commend)
+        self.commandsQueue.put(command)
 
-    def _createCommends(self):
+    def _createCommands(self):
         """
-        Creates commends for the robots, if no client has sent a commend.
+        Creates commands for the robots, if no client has sent a command.
         """
-        commend = str(random.randint(1, 4) * 4)
-        self.commendsQueue.put(commend)
+        command = str(random.randint(1, 4) * 4)
+        self.commandsQueue.put(command)
 
     def _listenRobot(self, robotsocket, address):
         """
@@ -158,8 +157,8 @@ class Server:
             of a int.
         """
         while self.RUN:
-            if self.commendsQueue.qsize() <= 0:
-                self._createCommends()
+            if self.commandsQueue.qsize() <= 0:
+                self._createCommands()
 
             try:
                 robotsocket.settimeout(1)
@@ -170,11 +169,11 @@ class Server:
             except:
                 pass
 
-            commend = self.commendsQueue.get()
-            for i in range(self.commendsQueue.qsize() + 1):
+            command = self.commandsQueue.get()
+            for i in range(self.commandsQueue.qsize() + 1):
                 try:
-                    robotsocket.sendall(pickle.dumps(commend))
-                    print("Successfully sent a commend (" + str(commend) + ") to a robot at: " + address[0])
+                    robotsocket.sendall(pickle.dumps(command))
+                    print("Successfully sent a command (" + str(command) + ") to a robot at: " + address[0])
                 except:
                     pass
 
@@ -237,6 +236,3 @@ if __name__ == "__main__":
             data = None
         except KeyboardInterrupt:
             server.disconnect()
-
-
-

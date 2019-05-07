@@ -4,14 +4,14 @@ import socket, pickle
 
 class Client:
     """
-    A class which handles a client. It can connect to a server and transmits commends for the robot(s) to the server.
+    A class which handles a client. It can connect to a server and transmits commands for the robot(s) to the server.
 
     Methods
     -------
     connect(self)
         Connects the client to the server.
-    send(self, commend):
-        Tries to send a commend for the robot(s) to the server.
+    send(self, command):
+        Tries to send a command for the robot(s) to the server.
     disconnect(self)
         Disconnects the client to the server.
     """
@@ -34,14 +34,14 @@ class Client:
             The servers port number.
         socket : socket
             The client socket.
-        commendsQueue : Queue
-            A queue with commends for the robot(s).
+        commandsQueue : Queue
+            A queue with commands for the robot(s).
         """
         self.SERVER_HOST = host
         self.SERVER_PORT = port
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.settimeout(5)
-        self.commendsQueue = Queue()
+        self.commandsQueue = Queue()
 
     def __del__(self):
         """
@@ -66,14 +66,14 @@ class Client:
             raise Exception("The client couldn't connect to the server!")
 
 
-    def send(self, commend):
+    def send(self, command):
         """
-        Sending a new commend for the robot(s) through the server.
+        Sending a new command for the robot(s) through the server.
 
         Parameters
         ----------
-        commend: string
-            The new commend for the robot(s).
+        command: string
+            The new command for the robot(s).
         """
         try:
             self.socket.settimeout(1)
@@ -84,15 +84,15 @@ class Client:
         except:
             pass
         try:
-            print("Trying to send new commend to server (" + str(commend) + ")...")
-            self._setCommend(commend)
-            self.socket.sendall(pickle.dumps(self.commendsQueue.get()))
+            print("Trying to send new command to server (" + str(command) + ")...")
+            self._setCommand(command)
+            self.socket.sendall(pickle.dumps(self.commandsQueue.get()))
         except:
             print("Couldn't send to server, the server is probably disconnected.")
             self.disconnect()
             return
 
-        print("Successfully sent commend to the server! (" + str(commend) + ")")
+        print("Successfully sent command to the server! (" + str(command) + ")")
 
     def disconnect(self):
         """
@@ -106,16 +106,16 @@ class Client:
         finally:
             self.socket.close()
 
-    def _setCommend(self, commend):
+    def _setCommand(self, command):
         """
-        Setting a new commend for the robot(s) in the commendsQueue.
+        Setting a new command for the robot(s) in the commandsQueue.
 
         Parameters
         ----------
-        commend: string
-            The new commend for the robot(s).
+        command: string
+            The new command for the robot(s).
         """
-        self.commendsQueue.put(commend)
+        self.commandsQueue.put(command)
 
 if __name__ == "__main__":
     client = Client()
