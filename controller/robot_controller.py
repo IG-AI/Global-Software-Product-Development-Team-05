@@ -9,14 +9,35 @@ import authentication.jwt_token_py as jwt
 from model.robot import Robot
 from model.account import Account
 from util.direction import changing_direction
+from util.echo_client import send
+#from util.echo_server import listen
+
+HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
+PORT = 65432
 
 robots = Blueprint('robot',__name__)
+
+@robots.route("/lego", methods = ['POST'])
+def log():
+    request_data = request.get_data()
+    data = json.loads(request_data)
+    message = data['request']
+    message = bytes(message, 'utf-8')
+    try:
+        send(HOST, PORT, message)
+    except Exception:
+        send(HOST, PORT, bytes('Error', 'utf-8'))
+    return jsonify({'message': 'received'}), 404
 
 @robots.route("/api/map", methods = ['POST'])
 @pre_authorized
 def map():
-    try:
-        {}
+    data = request.get_data()    
+    data = json.loads(data)    
+    message = data['message']    
+    message = bytes(message, 'utf-8')
+    try:       
+        send(HOST, PORT, message)
         #PAcket code goes there
     except Exception:
         return json.dumps({'message': 'Cannot connect to robot'}), 400
@@ -25,8 +46,12 @@ def map():
 @robots.route("/api/auto", methods = ['POST'])
 @pre_authorized
 def command_auto():
+    data = request.get_data()
+    data = json.loads(data)
+    message = data['message']
+    message = bytes(message, 'utf-8')
     try:
-        {}
+        send(HOST, PORT, message)
         #PAcket code goes there
     except Exception:
         return json.dumps({'message': 'Cannot connect to robot'}), 400
@@ -110,16 +135,19 @@ def delete():
 @pre_authorized
 def create_robot():
     request_data = request.get_data()
+    print(request_data)
     try:
         token = request.headers.get('Authorization')
         payload = jwt.decode(token[7:])
         account_id = payload.get('sub')
+        print(account_id)
         if (account_id == None):
             raise Exception
 
         account = Account.find_by_id(account_id)
 
         data = json.loads(request_data)
+        print(data)
         current_location_x = data['x']
         current_location_y = data['y']
         current_direction = data['direction']
