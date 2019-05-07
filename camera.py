@@ -1,4 +1,4 @@
-import socket, pickle, time
+import socket, pickle
 
 class Camera:
     def __init__(self, host='127.0.1.1', port=2627):

@@ -26,21 +26,21 @@ class Server:
         while self.RUN:
             clientsocket, address = self.socket.accept()
             try:
-                temp = pickle.loads(clientsocket.recv(4096))
+                data = pickle.loads(clientsocket.recv(4096))
             except:
                 raise Exception("Failed to receive the client type!")
             try:
-                if temp == 'robot':
+                if data == 'robot':
                     print("Connecting to the robot...")
                     _thread.start_new_thread(self._listenRobot, (clientsocket,))
                     print("Connected to the robot!")
-                elif temp == 'client':
-                    self.clients.append(temp)
+                elif data == 'client':
+                    self.clients.append(data)
                     self.numClients = len(self.clients)
                     print("Connecting to a client...")
                     _thread.start_new_thread(self._listenClient, (clientsocket,))
                     print("Connected to the " + str(self.numClients) + " client at: " + str(address))
-                elif temp == 'camera':
+                elif data == 'camera':
                     print("Connecting to the camera...")
                     _thread.start_new_thread(self._listenCamera, (clientsocket,))
                     print("Connected to the camera!")
