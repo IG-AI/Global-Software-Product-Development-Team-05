@@ -1,4 +1,5 @@
-import socket, pickle
+import random
+import socket, pickle, _thread
 from queue import Queue
 from time import sleep
 
@@ -39,6 +40,8 @@ class Robot:
         """
         self.SERVER_HOST = host
         self.SERVER_PORT = port
+        self.MANUAL = False
+        self.RUN = False
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.commandsQueue = Queue()
 
@@ -66,10 +69,31 @@ class Robot:
             raise Exception("The robot couldn't connect to the server!")
 
 
-    def recv(self):
+    def recv(self, amount=None):
         """
-        Tries to receive a command form the server.
+        Tries to receive commands form the server. If input leaves emtpy it will continue until it gets a end call
+        from the server. Otherwise it will receive the same amount of commands as the input.
+
+        amount(=None): int
+            The amount of commands that should be received before the function should end. Of left empty, then it will
+            continue until the robot receives a end call from the server.
+
+        Raises
+        ------
+        Exception
+            If input isn't None or an int, Exception is raised.
         """
+        if (type(amount) == int) | (amount == None):
+            if amount == None:
+                while True:
+                    self._recvAux()
+            else:
+                for i in range(amount):
+                    self._recvAux()
+        else:
+            raise Exception("Invalid input! Input has to be an int.")
+
+    def _recvAux(self):
         try:
             print("Trying to receive a new command from server...")
             data = pickle.loads(self.socket.recv(4096))
@@ -77,12 +101,37 @@ class Robot:
                 self.RUN = False
                 self.disconnect()
                 return
+            elif data == "manual":
+                print("Manual Mode activated!")
+                self.MANUAL = True
+            elif data == "auto":
+                print("Auto Mode activated!")
+                self.MANUAL = False
+            elif data == "start":
+                print("Robot started!")
+                _thread.start_new_thread(self._startAux(), ())
+            elif data == "stop":
+                print("Robot stopped!")
+                self.stop()
             else:
                 print("Successfully received a command from the server! (" + str(data) + ")")
                 self.commandsQueue.put(data)
                 return
         except:
             pass
+
+    def start(self):
+        _thread.start_new_thread(self._startAux(), ())
+
+    def _startAux(self):
+        self.RUN = True
+        while self.RUN:
+            self.recv(1)
+            if (self.commandsQueue.empty()) & (self.MANUAL == False):
+                self._createCommands()
+
+    def stop(self):
+        self.RUN = False
 
     def disconnect(self):
         """
@@ -93,9 +142,14 @@ class Robot:
         sleep(1)
         self.socket.close()
 
+    def _createCommands(self):
+        """
+        Creates commands for the robots, if no client has sent a command.
+        """
+        command = str(random.randint(1, 4) * 4)
+        self.commandsQueue.put(command)
+
 if __name__ == "__main__":
     robot = Robot()
     robot.connect()
-    for i in range(20):
-        robot.recv()
-    robot.disconnect()
+    robot.recv()

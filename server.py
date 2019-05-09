@@ -51,6 +51,7 @@ class Server:
         self.robots = []
         self.commandsQueuesList = []
         self.robotsManualMode = []
+        self.robotsStarted = []
         self.videostream = None
 
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -67,30 +68,10 @@ class Server:
         """
         Setting up the connection for the server class, with a new thread.
         """
-        _thread.start_new_thread(self._connect_aux, ())
+        _thread.start_new_thread(self._connectAux, ())
         return
 
-    def getRobots(self):
-        """
-        Returns the list with connected robots.
-        """
-        return self.robots
-
-    def getClients(self):
-        """
-        Returns the list with connected clients.
-        """
-        return self.clients
-
-    def disconnect(self):
-        """
-        Closing down the connection for the server class.
-        """
-        print("Server closing down...")
-        self.RUN = False
-        self.socket.close()
-
-    def _connect_aux(self):
+    def _connectAux(self):
         """
         Aux function for the connection function, which starts new threads with new incoming connections.
 
@@ -138,23 +119,77 @@ class Server:
             except:
                 raise Exception("Failed to establish new connection!")
 
-    def _updateCommands(self, command):
+    def getRobots(self):
         """
-        Updates the commands queue.
+        Returns the list with connected robots.
+        """
+        return self.robots
+
+    def getClients(self):
+        """
+        Returns the list with connected clients.
+        """
+        return self.clients
+
+    def startRobot(self, robot, time=None):
+        """
+        Starts a specific robot as given in the input. A second parameter is optional, if left then the robot continues
+        until a stopRobot(robot) has been called. If given as a an int, the robot will run for that amount of time.
 
         Parameters
         ----------
-        command: string
-            The command should be put into the commands queue.
-        """
-        self.commandsQueue.put(command)
+        robot: (string, int)
+            A tuple with the IP address and port to the robot that should be started.
+        time(=None): int
+            A optional input, if left the robot will continue until it receives a stop call. Otherwise ot will
+            continue equal amout of time as set in the input or until receives a stop call.
 
-    def _createCommands(self, index):
+        Raises
+        ------
+        Exception
+            If input isn't None or an int, Exception is raised.
         """
-        Creates commands for the robots, if no client has sent a command.
+        if time == None:
+            if robot in self.robots:
+                print("Starting up robot at: " + str(robot))
+                self.robotsStarted.append(robot)
+            else:
+                print("Robot: " + str(robot) + " isn't connected to the server!")
+
+        elif type(time) == int:
+            if robot in self.robots:
+                print("Starting up robot at: " + str(robot))
+                self.robotsStarted.append(robot)
+                sleep(time)
+                self.stopRobot(robot)
+            else:
+                print("Robot: " + str(robot) + " isn't connected to the server!")
+        else:
+            raise Exception("Invalid input! Input has to be an int.")
+
+    def stopRobot(self, robot):
         """
-        command = str(random.randint(1, 4) * 4)
-        self.commandsQueuesList[index][1].put(command)
+        Stops a specific robot as given in the input.
+
+        Parameters
+        ----------
+        robot: (string, int)
+            A tuple with the IP address and port to the robot that should be started.
+        """
+        if robot in self.robotsStarted:
+            print("Turning off the robot  at: "+ str(robot))
+            self.robotsStarted.remove(robot)
+        else:
+            print("The robot: " + robot + " hasn't been started!")
+
+
+    def disconnect(self):
+        """
+        Closing down the connection for the server class.
+        """
+        print("Server closing down...")
+        self.RUN = False
+        self.socket.close()
 
     def _findCommandsQueue(self, address):
         """
@@ -187,12 +222,11 @@ class Server:
         newQueue = (address, Queue())
         self.commandsQueuesList.append(newQueue)
         self.robots.append(address)
+        sentManualFlag = False
+        sentStartedFlag = False
+        sentAutoFlag = False
+        sentStopFlag = False
         while self.RUN:
-            index = self._findCommandsQueue(address)
-
-            if (self.commandsQueuesList[index][1].qsize() <= 0) & (address not in self.robotsManualMode):
-                self._createCommands(index)
-
             try:
                 robotsocket.settimeout(1)
                 data = pickle.loads(robotsocket.recv(4096))
@@ -200,6 +234,31 @@ class Server:
                     break
             except:
                 pass
+
+            try:
+                if (address in self.robotsManualMode) & (sentManualFlag == False):
+                    robotsocket.sendall(pickle.dumps("manual"))
+                    sentManualFlag = True
+                elif (address not in self.robotsManualMode) & (sentAutoFlag == False):
+                    robotsocket.sendall(pickle.dumps("auto"))
+                    sentAutoFlag = True
+                else:
+                    pass
+            except:
+                pass
+
+            try:
+                if (address in self.robotsStarted) & (sentStartedFlag == False):
+                    robotsocket.sendall(pickle.dumps("start"))
+                    sentStartedFlag = True
+                elif (address not in self.robotsStarted) & (sentStopFlag == False):
+                    robotsocket.sendall(pickle.dumps("stop"))
+                    sentStopFlag = True
+                else:
+                    pass
+            except:
+                pass
+
 
             index = self._findCommandsQueue(address)
             for i in range(self.commandsQueuesList[index][1].qsize()):
@@ -254,6 +313,7 @@ class Server:
                     print("Successfully sent the robot list to: " + str(address))
                 except:
                     print("Failed to send robots list to: " + str(address))
+
             elif command == "manual":
                 if device == None:
                     for i in range(len(self.robots)):
@@ -266,6 +326,7 @@ class Server:
                         self.robotsManualMode.append(device)
                     except:
                         pass
+
             elif command == "auto":
                 if device == None:
                     for i in range(len(self.robots)):
@@ -317,8 +378,8 @@ class Server:
 if __name__ == "__main__":
     server = Server()
     server.connect()
+    startFlag = False
     while True:
-        try:
-            data = None
-        except KeyboardInterrupt:
-            server.disconnect()
+        if (len(server.robots) > 0) & (startFlag == False):
+            server.startRobot(server.robots[0], 120)
+            startFlag = True
