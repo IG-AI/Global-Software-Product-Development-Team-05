@@ -83,17 +83,17 @@ class Camera:
                 except:
                     pass
 
-    def disconnect(self):
-        """
-        Closing down the connection between the camera and the server.
-        """
-        self.socket.close()
-
     def updateVideo(self):
         """
         Updates the video stream from the camera.
         """
         self.videostream = 1
+
+    def disconnect(self):
+        """
+        Closing down the connection between the camera and the server.
+        """
+        self.socket.close()
 
 if __name__ == "__main__":
         camera = Camera()

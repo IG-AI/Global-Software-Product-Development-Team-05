@@ -39,8 +39,9 @@ class Client:
         """
         self.SERVER_HOST = host
         self.SERVER_PORT = port
+        self.SERVER_ROBOTSLIST = []
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.settimeout(5)
+        self.socket.settimeout(10)
         self.commandsQueue = Queue()
 
     def __del__(self):
@@ -66,7 +67,7 @@ class Client:
             raise Exception("The client couldn't connect to the server!")
 
 
-    def send(self, command):
+    def send(self, command, robot=None):
         """
         Sending a new command for the robot(s) through the server.
 
@@ -74,6 +75,9 @@ class Client:
         ----------
         command: string
             The new command for the robot(s).
+        robot: string
+            Name of the robot how should receive the command, by default None which would send the commend to all
+            robots.
         """
         try:
             self.socket.settimeout(1)
@@ -83,10 +87,14 @@ class Client:
                 return
         except:
             pass
+
+        if robot==None:
+            print("Trying to send a new command (" + str(command) + ") to all robots")
+        else:
+            print("Trying to send a new command (" + str(command) + ") to a robot at: " + str(robot))
         try:
-            print("Trying to send new command to server (" + str(command) + ")...")
             self._setCommand(command)
-            self.socket.sendall(pickle.dumps(self.commandsQueue.get()))
+            self.socket.sendall(pickle.dumps((robot, self.commandsQueue.get())))
         except:
             print("Couldn't send to server, the server is probably disconnected.")
             self.disconnect()
@@ -94,13 +102,36 @@ class Client:
 
         print("Successfully sent command to the server! (" + str(command) + ")")
 
+    def recvRobots(self):
+        """
+        Receive the robots list from the server.
+        """
+        try:
+            self.socket.settimeout(1)
+            stop = pickle.loads(self.socket.recv(4096))
+            if stop == "end":
+                self.disconnect()
+                return []
+        except:
+            pass
+
+        self.socket.sendall(pickle.dumps((None, "robotlist")))
+        try:
+            print("Trying to receive robot list from server...")
+            robotlist = pickle.loads(self.socket.recv(4096))
+            print("Successfully received robot list from server!")
+            return robotlist
+        except:
+            print("Failed to receive robot list from server...")
+            return []
+
     def disconnect(self):
         """
         Closing down the connection between the client and the server.
         """
         print("Client disconnecting...")
         try:
-            self.socket.sendall(pickle.dumps("end"))
+            self.socket.sendall(pickle.dumps((None, "end")))
         except:
             pass
         finally:
@@ -121,6 +152,7 @@ if __name__ == "__main__":
     client = Client()
     client.connect()
     for i in range(10):
-        client.send('1')
+        client.SERVER_ROBOTSLIST = client.recvRobots()
+        client.send('1', client.SERVER_ROBOTSLIST[0])
         sleep(1)
     client.disconnect()
