@@ -76,9 +76,9 @@ class Client:
         ----------
         command: string
             The new command for the robot(s).
-        robot: string
-            Name of the robot how should receive the command, by default None which would send the commend to all
-            robots.
+        robot(=None): string
+            Address in the the form (IP, PORT) for the robot how should receive the command. If None, then the command
+            will be sent to all connected robots.
         """
         self._updateRobotsList()
         if len(self.SERVER_ROBOTSLIST) > 0:
@@ -110,17 +110,67 @@ class Client:
         else:
             print("There isn't any robots connected to the server!")
 
+    def activateManualMode(self, robot=None):
+        """
+        Activates manual mode for a robot(s), so it starts to only listing for commands from clients.
+
+        Parameters
+        ----------
+        robot(=None): string
+            Address in the the form (IP, PORT) for the robot how should receive the manual mode command. If None, then
+            the command will be sent to all connected robots.
+        """
+        try:
+            self.socket.settimeout(1)
+            stop = pickle.loads(self.socket.recv(4096))
+            if stop == "end":
+                self.disconnect()
+                return
+        except:
+            pass
+
+        if robot == None:
+            print("Activating manual mode for all robots!")
+        else:
+            print("Activating manual mode for a robot at : " + str(robot))
+        self._updateRobotsList()
+        self.socket.sendall(pickle.dumps((robot, "manual")))
+
+    def deactivateManualMode(self, robot=None):
+        """
+        Deactivates manual mode for a robot(s), so it starts moving automatically.
+
+        Parameters
+        ----------
+        robot(=None): string
+            Address in the the form (IP, PORT) for the robot how should receive the auto mode command. If None, then
+            the command will be sent to all connected robots.
+        """
+        try:
+            self.socket.settimeout(1)
+            stop = pickle.loads(self.socket.recv(4096))
+            if stop == "end":
+                self.disconnect()
+                return
+        except:
+            pass
+
+        if robot == None:
+            print("Deactivating manual mode for all robots!")
+        else:
+            print("Deactivating manual mode for a robot at : " + str(robot))
+        self._updateRobotsList()
+        self.socket.sendall(pickle.dumps((robot, "auto")))
+
     def disconnect(self):
         """
         Closing down the connection between the client and the server.
         """
         print("Client disconnecting...")
-        try:
-            self.socket.sendall(pickle.dumps((None, "end")))
-        except:
-            pass
-        finally:
-            self.socket.close()
+
+        self.socket.sendall(pickle.dumps((None, "end")))
+        sleep(1)
+        self.socket.close()
 
     def _setCommand(self, command):
         """
@@ -166,7 +216,9 @@ class Client:
 if __name__ == "__main__":
     client = Client()
     client.connect()
-    for i in range(10):
+    client.activateManualMode()
+    for i in range(5):
         if len(client.SERVER_ROBOTSLIST) > 0:
             client.sendCommand('1', client.SERVER_ROBOTSLIST[0])
+    client.deactivateManualMode()
     client.disconnect()

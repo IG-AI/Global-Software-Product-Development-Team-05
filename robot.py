@@ -89,12 +89,9 @@ class Robot:
         Closing down the connection between the robot and the server.
         """
         print("Robot disconnecting...")
-        try:
-            self.socket.sendall(pickle.dumps("end"))
-        except:
-            pass
-        finally:
-            self.socket.close()
+        self.socket.sendall(pickle.dumps("end"))
+        sleep(1)
+        self.socket.close()
 
 if __name__ == "__main__":
     robot = Robot()

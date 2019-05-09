@@ -50,6 +50,7 @@ class Server:
         self.clients = []
         self.robots = []
         self.commandsQueuesList = []
+        self.robotsManualMode = []
         self.videostream = None
 
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -185,21 +186,18 @@ class Server:
         """
         newQueue = (address, Queue())
         self.commandsQueuesList.append(newQueue)
+        self.robots.append(address)
         while self.RUN:
             index = self._findCommandsQueue(address)
 
-            if self.commandsQueuesList[index][1].qsize() <= 0:
+            if (self.commandsQueuesList[index][1].qsize() <= 0) & (address not in self.robotsManualMode):
                 self._createCommands(index)
 
             try:
                 robotsocket.settimeout(1)
                 data = pickle.loads(robotsocket.recv(4096))
                 if data == "end":
-                    index = self._findCommandsQueue(address)
-                    self.commandsQueuesList.pop(index)
-                    self.robots.remove(address)
-                    print("Disconnecting a robot at " + str(address) + "...")
-                    return
+                    break
             except:
                 pass
 
@@ -213,10 +211,16 @@ class Server:
                     pass
 
         index = self._findCommandsQueue(address)
-        self.commandsQueuesList[index].pop()
-        self.robots.remove(address)
-        hostName = robotsocket.gethostbyname(robotsocket.gethostname())
-        print("Disconnecting a robot at " + hostName + "...")
+        self.commandsQueuesList.pop(index)
+        try:
+            self.robots.remove(address)
+        except:
+            pass
+        try:
+            self.robotsManualMode.remove(address)
+        except:
+            pass
+        print("Disconnecting a robot at " + str(address) + "...")
         robotsocket.sendall(pickle.dumps("end"))
 
     def _listenClient(self, clientsocket, address):
@@ -232,10 +236,17 @@ class Server:
             A tuple with the IP address of the client in the form of a string and a port number to the client in the
             form of a int.
         """
+        self.clients.append(address)
         while self.RUN:
             device, command = pickle.loads(clientsocket.recv(4096))
             if command == "end":
-                break
+                try:
+                    self.clients.remove(address)
+                except:
+                    pass
+                print("Disconnecting a client at " + str(address) + "...")
+                return
+
             elif command == "robotlist":
                 try:
                     print("Trying to send the robots list to " + str(address))
@@ -243,13 +254,41 @@ class Server:
                     print("Successfully sent the robot list to: " + str(address))
                 except:
                     print("Failed to send robots list to: " + str(address))
+            elif command == "manual":
+                if device == None:
+                    for i in range(len(self.robots)):
+                        try:
+                            self.robotsManualMode.append(self.robots[i])
+                        except:
+                            pass
+                else:
+                    try:
+                        self.robotsManualMode.append(device)
+                    except:
+                        pass
+            elif command == "auto":
+                if device == None:
+                    for i in range(len(self.robots)):
+                        try:
+                            self.robotsManualMode.remove(self.robots[i])
+                        except:
+                            pass
+                else:
+                    try:
+                        self.robotsManualMode.remove(device)
+                    except:
+                        pass
             else:
                 for i in range(len(self.commandsQueuesList)):
                     if self.commandsQueuesList[i][0] == device:
                         self.commandsQueuesList[i][1].put(command)
                         print("Received " + str(command) + " to robot at " + str(device) + " from a client at: " + str(address))
 
-        self.clients.remove(address)
+        try:
+            self.clients.remove(address)
+        except:
+            pass
+
         print("Disconnecting a client at " + str(address) + "...")
         clientsocket.sendall(pickle.dumps("end"))
 
