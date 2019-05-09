@@ -188,19 +188,23 @@ class Server:
         while self.RUN:
             index = self._findCommandsQueue(address)
 
-            # if self.commandsQueuesList[index][1].qsize() <= 0:
-                # self._createCommands(index)
+            if self.commandsQueuesList[index][1].qsize() <= 0:
+                self._createCommands(index)
 
             try:
                 robotsocket.settimeout(1)
                 data = pickle.loads(robotsocket.recv(4096))
                 if data == "end":
+                    index = self._findCommandsQueue(address)
+                    self.commandsQueuesList.pop(index)
+                    self.robots.remove(address)
                     print("Disconnecting a robot at " + str(address) + "...")
                     return
             except:
                 pass
 
-            while not self.commandsQueuesList[index][1].empty():
+            index = self._findCommandsQueue(address)
+            for i in range(self.commandsQueuesList[index][1].qsize()):
                 command = self.commandsQueuesList[index][1].get()
                 try:
                     robotsocket.sendall(pickle.dumps(command))

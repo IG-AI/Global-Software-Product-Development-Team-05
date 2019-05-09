@@ -99,7 +99,6 @@ class Robot:
 if __name__ == "__main__":
     robot = Robot()
     robot.connect()
-    for i in range(10):
+    for i in range(20):
         robot.recv()
-        sleep(1)
     robot.disconnect()
