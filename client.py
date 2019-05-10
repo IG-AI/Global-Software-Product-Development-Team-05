@@ -1,6 +1,6 @@
 from queue import Queue
 from time import sleep
-import socket, pickle
+import socket, pickle, random
 
 class Client:
     """
@@ -42,6 +42,7 @@ class Client:
         self.SERVER_ROBOTSLIST = []
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.settimeout(10)
+        self.map = None
         self.commandsQueue = Queue()
 
     def __del__(self):
@@ -64,6 +65,7 @@ class Client:
             self.socket.connect((self.SERVER_HOST, self.SERVER_PORT))
             self.socket.sendall(pickle.dumps('client'))
             self._updateRobotsList()
+            self._updateMap()
         except:
             raise Exception("The client couldn't connect to the server!")
 
@@ -131,10 +133,13 @@ class Client:
 
         if robot == None:
             print("Activating manual mode for all robots!")
+            self._updateRobotsList()
+            for i in range(len(self.SERVER_ROBOTSLIST)):
+                self.socket.sendall(pickle.dumps((self.SERVER_ROBOTSLIST[i], "manual")))
         else:
             print("Activating manual mode for a robot at : " + str(robot))
-        self._updateRobotsList()
-        self.socket.sendall(pickle.dumps((robot, "manual")))
+            self._updateRobotsList()
+            self.socket.sendall(pickle.dumps((robot, "manual")))
 
     def deactivateManualMode(self, robot=None):
         """
@@ -157,19 +162,20 @@ class Client:
 
         if robot == None:
             print("Deactivating manual mode for all robots!")
+            self._updateRobotsList()
+            for i in range(len(self.SERVER_ROBOTSLIST)):
+                self.socket.sendall(pickle.dumps((self.SERVER_ROBOTSLIST[i], "auto")))
         else:
             print("Deactivating manual mode for a robot at : " + str(robot))
-        self._updateRobotsList()
-        self.socket.sendall(pickle.dumps((robot, "auto")))
+            self.socket.sendall(pickle.dumps((robot, "auto")))
 
     def disconnect(self):
         """
         Closing down the connection between the client and the server.
         """
         print("Client disconnecting...")
-
-        self.socket.sendall(pickle.dumps((None, "end")))
         sleep(1)
+        self.socket.sendall(pickle.dumps((self.socket.getsockname(), "end")))
         self.socket.close()
 
     def _setCommand(self, command):
@@ -204,21 +210,51 @@ class Client:
             pass
 
         self.socket.sendall(pickle.dumps((None, "robotlist")))
+
         try:
             print("Trying to receive robot list from server...")
+            sleep(1)
             robotlist = pickle.loads(self.socket.recv(4096))
             print("Successfully received robot list from server!")
             return robotlist
         except:
-            print("Failed to receive robot list from server...")
-            return []
+             print("Failed to receive robot list from server...")
+             return []
+
+    def _updateMap(self):
+        self.map = self._recvMap()
+
+    def _recvMap(self):
+        """
+        Receive the map from the server.
+        """
+        try:
+            self.socket.settimeout(1)
+            stop = pickle.loads(self.socket.recv(4096))
+            if stop == "end":
+                self.disconnect()
+                return []
+        except:
+            pass
+
+        self.socket.sendall(pickle.dumps((None, "map")))
+
+        try:
+            print("Trying to receive map from server...")
+            sleep(1)
+            map = pickle.loads(self.socket.recv(4096))
+            print("Successfully received map from server!")
+            return map
+        except:
+            print("Failed to receive map from server, probably the server that doesn't have access to any map ...")
+            return None
+
 
 if __name__ == "__main__":
     client = Client()
     client.connect()
     client.activateManualMode()
-    for i in range(5):
-        if len(client.SERVER_ROBOTSLIST) > 0:
-            client.sendCommand('1', client.SERVER_ROBOTSLIST[0])
+    if len(client.SERVER_ROBOTSLIST) > 0:
+        client.sendCommand('1', client.SERVER_ROBOTSLIST[random.randint(0, 1)])
     client.deactivateManualMode()
     client.disconnect()

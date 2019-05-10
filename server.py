@@ -1,6 +1,6 @@
 from queue import Queue
 from time import sleep
-import socket, pickle, _thread, random
+import socket, pickle, _thread
 
 class Server:
     """
@@ -53,6 +53,7 @@ class Server:
         self.robotsManualMode = []
         self.robotsStarted = []
         self.videostream = None
+        self.map = None
 
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.socket.bind((self.HOST, self.PORT))
@@ -102,12 +103,10 @@ class Server:
             try:
                 if id == 'robot':
                     print("Connecting to a robot at: " + str(address))
-                    self.robots.append(address)
                     _thread.start_new_thread(self._listenRobot, (socket,address))
                     print("Connected to the robot!")
                 elif id == 'client':
                     print("Connecting to a client at: " + str(address))
-                    self.clients.append(address)
                     _thread.start_new_thread(self._listenClient, (socket,address))
                     print("Connected to a client!")
                 elif id == 'camera':
@@ -118,6 +117,17 @@ class Server:
                     print("Unknown device trying to connect!")
             except:
                 raise Exception("Failed to establish new connection!")
+
+    def setMap(self, map):
+        """
+        Sets the map over the building the robot(s) should operate in.
+
+        Parameters
+        ----------
+        map: matrix
+            A matrix representing the layout of the building the robot(s) will operate in.
+        """
+        self.map = map
 
     def getRobots(self):
         """
@@ -132,6 +142,20 @@ class Server:
         return self.clients
 
     def startRobot(self, robot, time=None):
+        """
+        Starts a robot in a new thread
+
+        Parameters
+        ----------
+        robot: (string, int)
+            A tuple with the IP address and port to the robot that should be started.
+        time(=None): int
+            A optional input, if left the robot will continue until it receives a stop call. Otherwise ot will
+            continue equal amout of time as set in the input or until receives a stop call.
+        """
+        _thread.start_new_thread(self._startRobotAux, (robot, time))
+
+    def _startRobotAux(self, robot, time=None):
         """
         Starts a specific robot as given in the input. A second parameter is optional, if left then the robot continues
         until a stopRobot(robot) has been called. If given as a an int, the robot will run for that amount of time.
@@ -182,13 +206,13 @@ class Server:
         else:
             print("The robot: " + robot + " hasn't been started!")
 
-
     def disconnect(self):
         """
         Closing down the connection for the server class.
         """
         print("Server closing down...")
         self.RUN = False
+        sleep(1)
         self.socket.close()
 
     def _findCommandsQueue(self, address):
@@ -223,10 +247,11 @@ class Server:
         self.commandsQueuesList.append(newQueue)
         self.robots.append(address)
         sentManualFlag = False
-        sentStartedFlag = False
-        sentAutoFlag = False
-        sentStopFlag = False
+        sentStartFlag = False
+        sentAutoFlag = None
+        sentStopFlag = None
         while self.RUN:
+            sleep(1)
             try:
                 robotsocket.settimeout(1)
                 data = pickle.loads(robotsocket.recv(4096))
@@ -235,30 +260,27 @@ class Server:
             except:
                 pass
 
-            try:
-                if (address in self.robotsManualMode) & (sentManualFlag == False):
-                    robotsocket.sendall(pickle.dumps("manual"))
-                    sentManualFlag = True
-                elif (address not in self.robotsManualMode) & (sentAutoFlag == False):
-                    robotsocket.sendall(pickle.dumps("auto"))
-                    sentAutoFlag = True
-                else:
-                    pass
-            except:
+            if (address in self.robotsManualMode) & (sentManualFlag == False):
+                robotsocket.sendall(pickle.dumps("manual"))
+                sentAutoFlag = False
+                sentManualFlag = True
+            elif (address not in self.robotsManualMode) & (sentAutoFlag == False):
+                robotsocket.sendall(pickle.dumps("auto"))
+                sentManualFlag = False
+                sentAutoFlag = True
+            else:
                 pass
 
-            try:
-                if (address in self.robotsStarted) & (sentStartedFlag == False):
-                    robotsocket.sendall(pickle.dumps("start"))
-                    sentStartedFlag = True
-                elif (address not in self.robotsStarted) & (sentStopFlag == False):
-                    robotsocket.sendall(pickle.dumps("stop"))
-                    sentStopFlag = True
-                else:
-                    pass
-            except:
+            if (address in self.robotsStarted) & (sentStartFlag == False):
+                robotsocket.sendall(pickle.dumps("start"))
+                sentStopFlag = False
+                sentStartFlag = True
+            elif (address not in self.robotsStarted) & (sentStopFlag == False):
+                robotsocket.sendall(pickle.dumps("stop"))
+                sentStartFlag = False
+                sentStopFlag = True
+            else:
                 pass
-
 
             index = self._findCommandsQueue(address)
             for i in range(self.commandsQueuesList[index][1].qsize()):
@@ -297,6 +319,7 @@ class Server:
         """
         self.clients.append(address)
         while self.RUN:
+            sleep(1)
             device, command = pickle.loads(clientsocket.recv(4096))
             if command == "end":
                 try:
@@ -314,14 +337,27 @@ class Server:
                 except:
                     print("Failed to send robots list to: " + str(address))
 
+            elif command == "map":
+                print("Trying to send the map to a client at: " + str(address))
+                if self.map == None:
+                    print("The server hasn't any map!")
+                    pass
+                elif address in self.clients:
+                    clientsocket.sendall(pickle.dumps(self.map))
+                    print("Successfully sent the map to a client at: " + str(address))
+                else:
+                    print("Failed to send robots list to: " + str(address))
+
             elif command == "manual":
                 if device == None:
+                    print("Manual Mode Activated for all robots!")
                     for i in range(len(self.robots)):
                         try:
                             self.robotsManualMode.append(self.robots[i])
                         except:
                             pass
                 else:
+                    print("Manual Mode Activated for a robot at: " + str(device))
                     try:
                         self.robotsManualMode.append(device)
                     except:
@@ -329,16 +365,16 @@ class Server:
 
             elif command == "auto":
                 if device == None:
+                    print("Auto Mode Activated for all robots!")
                     for i in range(len(self.robots)):
                         try:
                             self.robotsManualMode.remove(self.robots[i])
                         except:
                             pass
                 else:
-                    try:
-                        self.robotsManualMode.remove(device)
-                    except:
-                        pass
+                    print("Auto Mode Activated for a robot at: " + str(device))
+                    self.robotsManualMode.remove(device)
+
             else:
                 for i in range(len(self.commandsQueuesList)):
                     if self.commandsQueuesList[i][0] == device:
@@ -367,6 +403,7 @@ class Server:
             form of a int.
         """
         while self.RUN:
+            sleep(1)
             try:
                 self.videostream = pickle.loads(camerasocket.recv(4096))
             except:
@@ -379,7 +416,15 @@ if __name__ == "__main__":
     server = Server()
     server.connect()
     startFlag = False
+    startFlag2 = False
     while True:
+        sleep(1)
         if (len(server.robots) > 0) & (startFlag == False):
             server.startRobot(server.robots[0], 120)
             startFlag = True
+            print("Prutt")
+
+        elif (len(server.robots) > 1) & (startFlag2 == False):
+            server.startRobot(server.robots[1], 120)
+            startFlag2 = True
+

@@ -65,6 +65,8 @@ class Robot:
             self.socket.connect((self.SERVER_HOST, self.SERVER_PORT))
             self.socket.sendall(pickle.dumps('robot'))
             self.RUN = True
+
+            self.recv(1)
         except:
             raise Exception("The robot couldn't connect to the server!")
 
@@ -94,6 +96,9 @@ class Robot:
             raise Exception("Invalid input! Input has to be an int.")
 
     def _recvAux(self):
+        """
+        Aux function to the recv function.
+        """
         try:
             print("Trying to receive a new command from server...")
             data = pickle.loads(self.socket.recv(4096))
@@ -118,19 +123,31 @@ class Robot:
                 self.commandsQueue.put(data)
                 return
         except:
+            print("Failed to receive command from server!")
             pass
 
     def start(self):
+        """
+        Function that starts the robot.
+        """
         _thread.start_new_thread(self._startAux(), ())
 
     def _startAux(self):
+        """
+        Aux function to the start function.
+        """
         self.RUN = True
         while self.RUN:
             self.recv(1)
             if (self.commandsQueue.empty()) & (self.MANUAL == False):
                 self._createCommands()
 
+        self.recv(1)
+
     def stop(self):
+        """
+        Function that stops the robot.
+        """
         self.RUN = False
 
     def disconnect(self):
@@ -152,4 +169,3 @@ class Robot:
 if __name__ == "__main__":
     robot = Robot()
     robot.connect()
-    robot.recv()
