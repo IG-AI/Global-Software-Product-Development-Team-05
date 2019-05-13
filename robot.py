@@ -2,6 +2,7 @@ import random
 import socket, pickle, _thread
 from queue import Queue
 from time import sleep
+import nxt
 
 class Robot:
     """
