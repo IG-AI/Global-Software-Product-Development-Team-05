@@ -47,7 +47,8 @@ class Robot:
         self.brickName, self.brickHost, self.brickSignalStrength, self.brickUserFlash = self.BRICK.get_device_info()
         self.LEFT_MOTOR = nxt.Motor(self.BRICK, 'PORT_A')
         self.RIGHT_MOTOR = nxt.Motor(self.BRICK, 'PORT_B')
-        self.MOTOR = nxt.Motor(self.BRICK, 'PORT_A')
+        self.LIGHT_SENSOR = nxt.Light(self.BRICK, 'PORT_C')
+        self.TEMPERATURE_SENSOR = Temperature(self.BRICK, 'PORT_D')
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.commandsQueue = Queue()
 
@@ -226,6 +227,27 @@ class Robot:
         """
         command = str(random.randint(1, 4) * 4)
         self.commandsQueue.put(command)
+
+class Temperature(nxt.BaseAnalogSensor):
+    """
+    Class that handles the temperature sensors, which inheritance from the class BaseAnalogSensor in the nxt_python package.
+    """
+    def __init__(self, brick, port):
+        """
+        Creates the Temperature sensor object.
+
+        Parameters
+        ----------
+        brick: Brick
+            The LEGO brick which should control the sensor.
+        port: string
+            The port the sensor is connected to on the brick.
+        """
+        super(Temperature, self).__init__(brick, port)
+
+    def getTemperature(self):
+        return self.get_input_values()
+
 
 if __name__ == "__main__":
     robot = Robot()
