@@ -4,6 +4,11 @@ from queue import Queue
 from time import sleep
 import nxt
 
+PORT_A = 0x00
+PORT_B = 0x01
+PORT_C = 0x02
+PORT_D = 0x03
+
 class Robot:
     """
     A class which handles a LEGO robot. It can connect to a server and receive commands form the server.
@@ -17,7 +22,7 @@ class Robot:
     disconnect(self)
         Disconnects the robot to the server.
     """
-    def __init__(self, host='127.0.1.1', port=2526):
+    def __init__(self, host='127.0.1.1', port=2526, pos=(1, 1)):
         """
         Initialize the robot class, with a host and port as optional input.
 
@@ -45,10 +50,12 @@ class Robot:
         self.RUN = False
         self.BRICK = nxt.locator.find_one_brick(name = 'MyRobot')
         self.brickName, self.brickHost, self.brickSignalStrength, self.brickUserFlash = self.BRICK.get_device_info()
-        self.LEFT_MOTOR = nxt.Motor(self.BRICK, 'PORT_A')
-        self.RIGHT_MOTOR = nxt.Motor(self.BRICK, 'PORT_B')
-        self.LIGHT_SENSOR = nxt.Light(self.BRICK, 'PORT_C')
-        self.TEMPERATURE_SENSOR = Temperature(self.BRICK, 'PORT_D')
+        self.LEFT_MOTOR = nxt.Motor(self.BRICK, PORT_A)
+        self.RIGHT_MOTOR = nxt.Motor(self.BRICK, PORT_B)
+        self.LIGHT_SENSOR = nxt.Color20(self.BRICK, PORT_C)
+        self.LIGHT_SENSOR.set_light_color(nxt.Type.COLORRED)
+        self.TEMPERATURE_SENSOR = nxt.Temperature(self.BRICK, PORT_D)
+        self.POS = pos
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.commandsQueue = Queue()
 
@@ -199,8 +206,8 @@ class Robot:
                 If the input isn't an int, Exception is raised.
         """
         if type(speed) is int:
-            self.LEFT_MOTOR.run(64)
-            self.RIGHT_MOTOR.run(64)
+            self.LEFT_MOTOR.run(speed)
+            self.RIGHT_MOTOR.run(speed)
         else:
             raise Exception("The speed has to be an int!")
 
@@ -221,33 +228,36 @@ class Robot:
         self.BRICK.sock.close()
         self.socket.close()
 
+    def updatePos(self):
+        if not self.commandsQueue.empty():
+            newPos = self.commandsQueue.get()
+            X, Y = self.POS
+            newX, newY = newPos
+
+            if newX > X:
+                self.turn('right')
+
+            elif newX < X:
+                self.turn('r')
+
+            if self.POS == newPos:
+                print("Robot reached it destination at: " + self.POS)
+                self.brake()
+            else:
+                    while True:
+                        if self.LIGHT_SENSOR.get_color() > 75:
+                            X =+ 1
+                elif newX < X:
+
+    def setColorSensor(self):
+
+
     def _createCommands(self):
         """
         Creates commands for the robots, if no client has sent a command.
         """
         command = str(random.randint(1, 4) * 4)
         self.commandsQueue.put(command)
-
-class Temperature(nxt.BaseAnalogSensor):
-    """
-    Class that handles the temperature sensors, which inheritance from the class BaseAnalogSensor in the nxt_python package.
-    """
-    def __init__(self, brick, port):
-        """
-        Creates the Temperature sensor object.
-
-        Parameters
-        ----------
-        brick: Brick
-            The LEGO brick which should control the sensor.
-        port: string
-            The port the sensor is connected to on the brick.
-        """
-        super(Temperature, self).__init__(brick, port)
-
-    def getTemperature(self):
-        return self.get_input_values()
-
 
 if __name__ == "__main__":
     robot = Robot()
