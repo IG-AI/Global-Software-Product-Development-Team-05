@@ -422,7 +422,6 @@ if __name__ == "__main__":
         if (len(server.robots) > 0) & (startFlag == False):
             server.startRobot(server.robots[0], 120)
             startFlag = True
-            print("Prutt")
 
         elif (len(server.robots) > 1) & (startFlag2 == False):
             server.startRobot(server.robots[1], 120)
