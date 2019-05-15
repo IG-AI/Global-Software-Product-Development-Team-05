@@ -243,29 +243,41 @@ class Robot(Base):
         self.BRICK.sock.close()
         self.socket.close()
 
-    """
     def updatePos(self):
         if not self.commandsQueue.empty():
             newPos = self.commandsQueue.get()
             X, Y = self.POS
             newX, newY = newPos
-
-            if newX > X:
-                self.turn('right')
-
-            elif newX < X:
-                self.turn('r')
+            x_position = 'right'        # keep the x direction to know where to turn in the y axis
 
             if self.POS == newPos:
                 print("Robot reached it destination at: " + self.POS)
                 self.brake()
             else:
-                    while True:
-                        if self.LIGHT_SENSOR.get_color() > 75:
-                            X =+ 1
-
+                # TODO: where does the robot look? Maybe it does not need to turn!
+                if newX > X:
+                    self.turn('right')
                 elif newX < X:
-    """
+                    self.turn('left')
+                    x_position = 'left'
+
+                while any(self.POS != newX, Y):
+                    self.run()
+                self.stop()
+
+                if newY > Y:
+                    if x_position == 'right':
+                        self.turn('left')
+                    else:
+                        self.turn('right')
+                elif newY < Y:
+                    if x_position == 'right':
+                        self.turn('right')
+                    else:
+                        self.turn('left')
+                while any(self.POS != newX, newY):
+                    self.run()
+                self.stop()
 
     @property
     def serialize(self):
