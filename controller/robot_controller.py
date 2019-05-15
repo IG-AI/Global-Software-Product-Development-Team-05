@@ -1,43 +1,68 @@
 from flask import Flask, Blueprint, jsonify
 from flask import request
 import json
-#from sqlalchemy.orm import sessionmaker
 
 import authentication.login as login
 from authentication.login import pre_authorized
 import authentication.jwt_token_py as jwt
 from model.robot import Robot
 from model.account import Account
+from model.adrress import Address
 from util.direction import changing_direction
 from util.echo_client import send
-#from util.echo_server import listen
+from controller.lego_controller import map, process_map
 
-HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
+#HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
 PORT = 65432
 
 robots = Blueprint('robot',__name__)
 
-@robots.route("/lego", methods = ['POST'])
-def log():
-    request_data = request.get_data()
-    data = json.loads(request_data)
-    message = data['request']
-    message = bytes(message, 'utf-8')
-    try:
-        send(HOST, PORT, message)
-    except Exception:
-        send(HOST, PORT, bytes('Error', 'utf-8'))
-    return jsonify({'message': 'received'}), 404
+#What package belong to what robot?
+def convert_map(map):
+    i = 0    
+    line = map.splitlines()
+    while i < len(line):
+        br = line[i].split(' ')
+        j = 0
+        while j < len(br):
+            if br[j] == 'R':
+                br[j] = 'O'
+            elif br[j] == 'G':
+                br[j] = 'E'
+            #elif br = 'P':
+                #br = 'O'
+            j += 1
+        line[i] = ' '.join(br)
+        i += 1        
+    map = '\n'.join(line)
+    return map
 
 @robots.route("/api/map", methods = ['POST'])
 @pre_authorized
-def map():
+def receive_map():
+    global map
     data = request.get_data()    
     data = json.loads(data)    
-    message = data['message']    
-    message = bytes(message, 'utf-8')
-    try:       
-        send(HOST, PORT, message)
+    message = data['map']    
+    #message = bytes(message, 'utf-8')
+    try:
+        token = request.headers.get('Authorization')
+        payload = jwt.decode(token[7:])
+        robot_id = payload.get('sub')
+        if (robot_id == None):
+            raise Exception
+
+        address = Address.find_by_id(robot_id)
+        if not address:
+            return jsonify({'message': 'Robot did not register host'}), 404 
+        print(map)
+        map = message
+        map = convert_map(map)
+        print(map)
+        message = 'map:' + message   
+        message = bytes(message, 'utf-8')   
+        send(address.host, PORT, message)
+        #Update map
         #PAcket code goes there
     except Exception:
         return json.dumps({'message': 'Cannot connect to robot'}), 400
@@ -51,7 +76,16 @@ def command_auto():
     message = data['message']
     message = bytes(message, 'utf-8')
     try:
-        send(HOST, PORT, message)
+        token = request.headers.get('Authorization')
+        payload = jwt.decode(token[7:])
+        robot_id = payload.get('sub')
+        if (robot_id == None):
+            raise Exception
+
+        address = Address.find_by_id(robot_id)
+        if not address:
+            return jsonify({'message': 'Robot did not register host'}), 404 
+        send(address.host, PORT, message)
         #PAcket code goes there
     except Exception:
         return json.dumps({'message': 'Cannot connect to robot'}), 400
@@ -77,7 +111,10 @@ def command_direct():
 
         if (command == None):
             raise Exception
-
+        
+        #Control robot go to direction relative to facing of robot
+        #Server calculate new facing direction of robot relative to coordinate and save to database
+        
         if (command not in ["north", "east", "south", "west", "drop"]):
             return jsonify({'message': 'Not expected command'}), 404
         current_direction = robot.current_direction
@@ -85,14 +122,22 @@ def command_direct():
             new_direction = "center"
         else: 
             new_direction = changing_direction(current_direction, command)
+        message = bytes(command, 'utf-8')
        
         if (robot.role == True):
-            {}
+            address = Address.find_by_id(robot_id)
+            if not address:
+                return jsonify({'message': 'Robot did not register host'}), 404 
+            send(address.host, PORT, message)
             #PAcket code goes there
     except Exception:
         return jsonify({'message': 'Invalid data'}), 404
+    #Update map
+    global map
+    map = process_map(map, robot.current_location_x, robot.current_location_y, 'E')
     robot.move(new_direction)
     robot.save_to_db()
+    map = process_map(map, robot.current_location_x, robot.current_location_y, 'O')
     return "Successful"
 
 @robots.route("/api/position", methods = ['GET'])
@@ -151,9 +196,12 @@ def create_robot():
         current_location_x = data['x']
         current_location_y = data['y']
         current_direction = data['direction']
+        current_goal_x = data['goal_x']
+        current_goal_y = data['goal_y']
 
-        robot = Robot(account_id, account.role, current_location_x, current_location_y, current_direction)
+        robot = Robot(account_id, account.role, current_location_x, current_location_y, current_direction, current_goal_x, current_goal_y)
         robot.save_to_db()
+        #Update map
     except Exception:
         return jsonify({'message': 'Invalid data'}),404
     response = robot.serialize

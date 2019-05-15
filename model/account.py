@@ -36,3 +36,8 @@ class Account(Base):
     def find(cls, username, password):
         packet = cls.query.filter_by(username = username, password = password).first()
         return packet
+
+    @classmethod
+    def find_by_name(cls, username):
+        packet = cls.query.filter_by(username = username).first()
+        return packet

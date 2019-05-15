@@ -25,11 +25,31 @@ def bit_convert(binarystring):
 
     return switcher.get(binarystring, None)
 
-def changing_direction(direction, turning):
-    direction = convert(direction)
+def changing_direction(facing, turning):
+    facing = convert(facing)
     turning = convert(turning)
-    temp = int(direction) + int(turning)
+    temp = int(facing) + int(turning)
     temp = BitArray(bin(temp))
+    result = str(temp[-2:])
+    result = result[2:]
+    if (len(result) == 1):
+        result = "0" + result
+    print(result)
+    return bit_convert(result)
+
+def get_turning(facing, direction):
+    facing = convert(facing)
+    print(facing)
+    direction = convert(direction)
+    print(direction)
+    print("start")
+    temp = int(direction) - int(facing)
+    if (temp < 0):
+        temp += 4
+    print(temp)
+    print(bin(temp))
+    temp = BitArray(bin(temp))
+    print(temp)
     result = str(temp[-2:])
     result = result[2:]
     if (len(result) == 1):
