@@ -43,6 +43,11 @@ class Robot:
         self.SERVER_PORT = port
         self.MANUAL = False
         self.RUN = False
+        self.BRICK = nxt.locator.find_one_brick(name = 'MyRobot')
+        self.brickName, self.brickHost, self.brickSignalStrength, self.brickUserFlash = self.BRICK.get_device_info()
+        self.LEFT_MOTOR = nxt.Motor(self.BRICK, 'PORT_A')
+        self.RIGHT_MOTOR = nxt.Motor(self.BRICK, 'PORT_B')
+        self.MOTOR = nxt.Motor(self.BRICK, 'PORT_A')
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.commandsQueue = Queue()
 
@@ -77,13 +82,15 @@ class Robot:
         Tries to receive commands form the server. If input leaves emtpy it will continue until it gets a end call
         from the server. Otherwise it will receive the same amount of commands as the input.
 
+        Parameters
+        ----------
         amount(=None): int
             The amount of commands that should be received before the function should end. Of left empty, then it will
             continue until the robot receives a end call from the server.
 
         Raises
         ------
-        Exception
+        Exception:
             If input isn't None or an int, Exception is raised.
         """
         if (type(amount) == int) | (amount == None):
@@ -137,6 +144,7 @@ class Robot:
         """
         Aux function to the start function.
         """
+        self.BRICK.play_tone_and_wait(500, 5)
         self.RUN = True
         while self.RUN:
             self.recv(1)
@@ -149,7 +157,58 @@ class Robot:
         """
         Function that stops the robot.
         """
+        self.BRICK.play_tone_and_wait(300, 5)
         self.RUN = False
+
+    def turn(self, direction):
+        """
+        Turns the robot 90 degrees, either to left or right based on the input.
+
+        Parameters
+        ----------
+        direction ("left"/"right): string
+            The direction the robot should turn.
+
+        Raises
+        ------
+            Exception:
+                If the input isn't "left" or "right", Exception is raised.
+        """
+        if direction == 'left':
+            self.LEFT_MOTOR.turn(64, 90)
+            self.RIGHT_MOTOR.turn(-64, 90)
+        elif direction == 'right':
+            self.LEFT_MOTOR.turn(-64, 90)
+            self.RIGHT_MOTOR.turn(64, 90)
+        else:
+            raise Exception("The wheels can only turn either left or right!")
+
+    def run(self, speed=64):
+        """
+        Starts the motors, with the speed as the input, as the default 64
+
+        Parameters
+        ----------
+        speed (=64): int
+            The speed the robot should run in.
+
+        Raises
+        ------
+            Exception:
+                If the input isn't an int, Exception is raised.
+        """
+        if type(speed) is int:
+            self.LEFT_MOTOR.run(64)
+            self.RIGHT_MOTOR.run(64)
+        else:
+            raise Exception("The speed has to be an int!")
+
+    def brake(self):
+        """
+        Breaks the robots movement.
+        """
+        self.LEFT_MOTOR.brake()
+        self.RIGHT_MOTOR.brake()
 
     def disconnect(self):
         """
@@ -158,6 +217,7 @@ class Robot:
         print("Robot disconnecting...")
         self.socket.sendall(pickle.dumps("end"))
         sleep(1)
+        self.BRICK.sock.close()
         self.socket.close()
 
     def _createCommands(self):
