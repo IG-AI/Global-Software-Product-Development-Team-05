@@ -285,8 +285,8 @@ class Robot(Base):
 
         Raises
         ------
-            Exception:
-                If the input isn't an int, Exception is raised.
+        Exception:
+            If the input isn't an int, Exception is raised.
         """
         if type(speed) is int:
             if self.left_motor.idle():
@@ -315,22 +315,33 @@ class Robot(Base):
         self.sock.close()
 
 
-    def move(self):
+    def move(self, coordinate=None):
         """
         Moves the robot to the first coordinate in the commands_queue, if it's empty and manual mode isn't activated
         then it automatic creates a new command.
 
         Raises
         ------
-        If the command isn't in the format (x, y), Exception is raised.
-        """
-        if (self.commands_queue.empty()) & (self.MANUAL == False):
-            self._create_auto_commands()
+        Exception:
+            If the command isn't in the format (x, y), Exception is raised.
 
-        try:
-            X, Y = self.commands_queue.get()
-        except :
-            raise Exception("Wrong format of the coordinates from the server!")
+        Exception:
+            If the input isn't in the format (x, y) or None, Exception is raised.
+
+        """
+        if coordinate == None:
+            if (self.commands_queue.empty()) & (self.MANUAL == False):
+                self._create_auto_commands()
+
+            try:
+                X, Y = self.commands_queue.get()
+            except :
+                raise Exception("Wrong format of the coordinates from the server!")
+        else:
+            try:
+                X, Y = coordinate
+            except :
+                raise Exception("Wrong format of the input coordinates!")
 
         if self.current_location_x < X:
             self.turn("east")
