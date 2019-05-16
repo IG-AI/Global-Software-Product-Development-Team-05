@@ -17,10 +17,22 @@ class Robot(Base):
 
     Methods
     -------
-    connect(self)
+    connect(self):
         Connects the robot to the server.
     recv(self, command):
         Tries to receive a command form the server.
+    start(self):
+        Function that starts the robot in a new thread.
+    stop(self):
+        Function that stops the robot.
+    turn(self, direction):
+        Turns the robot 90 degrees, either to left or right based on the input which should be left or right.
+    run(self, speed=64):
+        Starts the motors, with the speed as the input, as the default 64.
+    start(self):
+        Function that starts the robot in a new thread.
+    brake(self):
+        Stops the robots motors.
     disconnect(self)
         Disconnects the robot to the server.
     """
@@ -49,36 +61,52 @@ class Robot(Base):
             The servers host address.
         SERVER_PORT : int
             The servers port number.
-        socket : socket
-            The robot socket.
-        commandsQueue : Queue
+        MANUAL: boolean
+            Flag that's indicates if the robot is in manual mode.
+        RUN: bollean
+            Flag that's indicates if the robot is running.
+        brick: brick
+            The LEGO brick object.
+        left_motor: Motor
+            Motor object that controls the left motor of the robot.
+        right_motor: Motor
+            Motor object that controls the right motor of the robot.
+        light_sensor: Color20
+            Light sensor object for the robot.
+        temperature_sensor: Temperature
+            Temperature sensor object for the robot.
+        pos: Tuple
+            A tuble with the robots coordinate in the format (x, y).
+        sock : socket
+            The robot sock.
+        commands_queue : Queue
             A queue with commands for the robot.
         """
         self.SERVER_HOST = host
         self.SERVER_PORT = port
         self.MANUAL = False
         self.RUN = False
-        self.BRICK = nxt.locator.find_one_brick(name = 'MyRobot')
-        self.brickName, self.brickHost, self.brickSignalStrength, self.brickUserFlash = self.BRICK.get_device_info()
-        self.LEFT_MOTOR = nxt.Motor(self.BRICK, PORT_A)
-        self.RIGHT_MOTOR = nxt.Motor(self.BRICK, PORT_B)
-        self.LIGHT_SENSOR = nxt.Color20(self.BRICK, PORT_C)
-        self.LIGHT_SENSOR.set_light_color(nxt.Type.COLORRED)
-        self.TEMPERATURE_SENSOR = nxt.Temperature(self.BRICK, PORT_D)
-        self.POS = pos
+        self.brick = nxt.locator.find_one_brick(name ='MyRobot')
+        self.brick_name, self.brick_host, self.brick_signal_strength, self.brick_user_flash = self.brick.get_device_info()
+        self.left_motor = nxt.Motor(self.brick, PORT_A)
+        self.right_motor = nxt.Motor(self.brick, PORT_B)
+        self.light_sensor = nxt.Color20(self.brick, PORT_C)
+        self.light_sensor.set_light_color(nxt.Type.COLORRED)
+        self.temperature_sensor = nxt.Temperature(self.brick, PORT_D)
+        self.pos = pos
         self.id = id
         self.role = role
         self.current_location_x = current_location_x
         self.current_location_y = current_location_y
         self.current_direction = current_direction
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.commandsQueue = Queue()
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.commands_queue = Queue()
 
     def __del__(self):
         """
         Disconnects the robot if the robot object is removed.
         """
-        self.socket.close()
+        self.sock.close()
 
     def connect(self):
         """
@@ -91,8 +119,8 @@ class Robot(Base):
         """
         try:
             print("Connecting to server on IP: " + str(self.SERVER_HOST) + " and port: " + str(self.SERVER_PORT))
-            self.socket.connect((self.SERVER_HOST, self.SERVER_PORT))
-            self.socket.sendall(pickle.dumps('robot'))
+            self.sock.connect((self.SERVER_HOST, self.SERVER_PORT))
+            self.sock.sendall(pickle.dumps('robot'))
             self.RUN = True
 
             self.recv(1)
@@ -119,20 +147,20 @@ class Robot(Base):
         if (type(amount) == int) | (amount == None):
             if amount == None:
                 while True:
-                    self._recvAux()
+                    self._recv_aux()
             else:
                 for i in range(amount):
-                    self._recvAux()
+                    self._recv_aux()
         else:
             raise Exception("Invalid input! Input has to be an int.")
 
-    def _recvAux(self):
+    def _recv_aux(self):
         """
         Aux function to the recv function.
         """
         try:
             print("Trying to receive a new command from server...")
-            data = pickle.loads(self.socket.recv(4096))
+            data = pickle.loads(self.sock.recv(4096))
             if data == "end":
                 self.RUN = False
                 self.disconnect()
@@ -145,13 +173,13 @@ class Robot(Base):
                 self.MANUAL = False
             elif data == "start":
                 print("Robot started!")
-                _thread.start_new_thread(self._startAux(), ())
+                _thread.start_new_thread(self._start_aux(), ())
             elif data == "stop":
                 print("Robot stopped!")
                 self.stop()
             else:
                 print("Successfully received a command from the server! (" + str(data) + ")")
-                self.commandsQueue.put(data)
+                self.commands_queue.put(data)
                 return
         except:
             print("Failed to receive command from server!")
@@ -159,19 +187,19 @@ class Robot(Base):
 
     def start(self):
         """
-        Function that starts the robot.
+        Function that starts the robot in a new thread.
         """
-        _thread.start_new_thread(self._startAux(), ())
+        _thread.start_new_thread(self._start_aux(), ())
 
-    def _startAux(self):
+    def _start_aux(self):
         """
         Aux function to the start function.
         """
-        self.BRICK.play_tone_and_wait(500, 5)
+        self.brick.play_tone_and_wait(500, 5)
         self.RUN = True
         while self.RUN:
             self.recv(1)
-            if (self.commandsQueue.empty()) & (self.MANUAL == False):
+            if (self.commands_queue.empty()) & (self.MANUAL == False):
                 self._createCommands()
 
         self.recv(1)
@@ -180,7 +208,7 @@ class Robot(Base):
         """
         Function that stops the robot.
         """
-        self.BRICK.play_tone_and_wait(300, 5)
+        self.brick.play_tone_and_wait(300, 5)
         self.RUN = False
 
     def turn(self, direction):
@@ -198,11 +226,11 @@ class Robot(Base):
                 If the input isn't "left" or "right", Exception is raised.
         """
         if direction == 'left':
-            self.LEFT_MOTOR.turn(64, 90)
-            self.RIGHT_MOTOR.turn(-64, 90)
+            self.left_motor.turn(64, 90)
+            self.right_motor.turn(-64, 90)
         elif direction == 'right':
-            self.LEFT_MOTOR.turn(-64, 90)
-            self.RIGHT_MOTOR.turn(64, 90)
+            self.left_motor.turn(-64, 90)
+            self.right_motor.turn(64, 90)
         else:
             raise Exception("The wheels can only turn either left or right!")
 
@@ -221,8 +249,8 @@ class Robot(Base):
                 If the input isn't an int, Exception is raised.
         """
         if type(speed) is int:
-            self.LEFT_MOTOR.run(speed)
-            self.RIGHT_MOTOR.run(speed)
+            self.left_motor.run(speed)
+            self.right_motor.run(speed)
         else:
             raise Exception("The speed has to be an int!")
 
@@ -230,23 +258,23 @@ class Robot(Base):
         """
         Breaks the robots movement.
         """
-        self.LEFT_MOTOR.brake()
-        self.RIGHT_MOTOR.brake()
+        self.left_motor.brake()
+        self.right_motor.brake()
 
     def disconnect(self):
         """
         Closing down the connection between the robot and the server.
         """
         print("Robot disconnecting...")
-        self.socket.sendall(pickle.dumps("end"))
+        self.sock.sendall(pickle.dumps("end"))
         sleep(1)
-        self.BRICK.sock.close()
-        self.socket.close()
+        self.brick.sock.close()
+        self.sock.close()
 
     """
     def updatePos(self):
-        if not self.commandsQueue.empty():
-            newPos = self.commandsQueue.get()
+        if not self.commands_queue.empty():
+            newPos = self.commands_queue.get()
             X, Y = self.POS
             newX, newY = newPos
 

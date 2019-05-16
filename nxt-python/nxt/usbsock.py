@@ -22,7 +22,7 @@ ID_PRODUCT_NXT = 0x0002
 class USBSock(object):
     'Object for USB connection to NXT'
 
-    bsize = 60	# USB socket block size
+    bsize = 60	# USB sock block size
 
     type = 'usb'
 

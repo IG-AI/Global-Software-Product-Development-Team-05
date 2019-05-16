@@ -20,7 +20,7 @@ from nxt.brick import Brick
 
 class BlueSock(object):
 
-    bsize = 118  # Bluetooth socket block size
+    bsize = 118  # Bluetooth sock block size
     PORT = 1     # Standard NXT rfcomm port
 
     type = 'bluetooth'

@@ -10,7 +10,7 @@ class Camera:
         Connects the camera to the server.
     disconnect(self)
         Disconnects the camera to the server.
-    updateVideo(self)
+    update_video(self)
         Updates the video stream from the camera.
     """
     def __init__(self, host='127.0.1.1', port=2526):
@@ -28,24 +28,24 @@ class Camera:
         ----------
         SERVER_HOST: string
             The servers host address.
-        SERVER_PORT : int
+        SERVER_PORT: int
             The servers port number.
-        socket : socket
-            The camera socket.
-        videostream : Video Stream
+        sock: socket
+            The camera sock.
+        videostream: Video Stream
             The video stream captured from the camera.
         """
         self.SERVER_HOST = host
         self.SERVER_PORT = port
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.settimeout(1)
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.settimeout(1)
         self.videostream = None
 
     def __del__(self):
         """
         Disconnects the camera if the camera object is removed.
         """
-        self.socket.close()
+        self.sock.close()
 
     def connect(self):
         """
@@ -57,7 +57,7 @@ class Camera:
             If the camera can't connect to the server, Exception is raised.
         """
         run = True
-        with self.socket as socket:
+        with self.sock as socket:
             try:
                 print(
                     "Connecting to server on IP: " + str(self.SERVER_HOST) + " and port: " + str(self.SERVER_PORT))
@@ -69,21 +69,21 @@ class Camera:
             print("Starts executing camera...")
             while run:
                 try:
-                    data = pickle.loads(self.socket.recv(4096))
+                    data = pickle.loads(self.sock.recv(4096))
                     if data == "end":
                         print("Camera disconnecting...")
                         run = False
                         self.disconnect()
-                        self.socket.close()
+                        self.sock.close()
                 except:
                     pass
                 try:
-                    self.updateVideo()
+                    self.update_video()
                     socket.sendall(pickle.dumps(self.videostream))
                 except:
                     pass
 
-    def updateVideo(self):
+    def update_video(self):
         """
         Updates the video stream from the camera.
         """
@@ -93,7 +93,7 @@ class Camera:
         """
         Closing down the connection between the camera and the server.
         """
-        self.socket.close()
+        self.sock.close()
 
 if __name__ == "__main__":
         camera = Camera()

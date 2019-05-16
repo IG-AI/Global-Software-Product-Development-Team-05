@@ -161,7 +161,7 @@ class BaseMotor(object):
  
         if tacho_limit < 0:
             raise ValueError("tacho_units must be greater than 0!")
-        #TODO Calibrate the new values for ip socket latency.
+        #TODO Calibrate the new values for ip sock latency.
         if self.method == 'bluetooth':
             threshold = 70
         elif self.method == 'usb':
