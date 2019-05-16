@@ -38,8 +38,8 @@ class Client:
             The servers port number.
         sock: socket
             The client sock.
-        commands_queue: Queue
-            A queue with commands for the robot(s).
+        coordinates_queue: Queue
+            A queue with coordinates that a robot(s) should move towards.
         """
         self.SERVER_HOST = host
         self.SERVER_PORT = port
@@ -47,7 +47,7 @@ class Client:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.settimeout(10)
         self.map = None
-        self.commands_queue = Queue()
+        self.coordinates_queue = Queue()
 
     def __del__(self):
         """
@@ -104,7 +104,7 @@ class Client:
                     print("Trying to send a new command (" + str(command) + ") to a robot at: " + str(robot))
                 try:
                     self._set_command(command)
-                    self.sock.sendall(pickle.dumps((robot, self.commands_queue.get())))
+                    self.sock.sendall(pickle.dumps((robot, self.coordinates_queue.get())))
                 except:
                     print("Couldn't send to server, the server is probably disconnected.")
                     self.disconnect()
@@ -184,14 +184,14 @@ class Client:
 
     def _set_command(self, command):
         """
-        Setting a new command for the robot(s) in the commands_queue.
+        Setting a new command for the robot(s) in the coordinates_queue.
 
         Parameters
         ----------
         command: string
             The new command for the robot(s).
         """
-        self.commands_queue.put(command)
+        self.coordinates_queue.put(command)
 
     def _update_robots_list(self):
         """

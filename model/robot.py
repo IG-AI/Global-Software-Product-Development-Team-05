@@ -77,8 +77,8 @@ class Robot(Base):
             Temperature sensor object for the robot.
         sock : socket
             The robot sock.
-        commands_queue : Queue
-            A queue with commands for the robot.
+        coordinates_queue : Queue
+            A queue with coordinate the robot should move towards.
         """
         self.SERVER_HOST = host
         self.SERVER_PORT = port
@@ -93,11 +93,9 @@ class Robot(Base):
         self.temperature_sensor = nxt.Temperature(self.brick, PORT_D)
         self.id = id
         self.role = role
-        self.current_location_x = current_location_x
-        self.current_location_y = current_location_y
-        self.current_direction = current_direction
+        self.assign_coordinate(current_location_x, current_location_y, current_direction)
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.commands_queue = Queue()
+        self.coordinates_queue = Queue()
 
     def __del__(self):
         """
@@ -176,7 +174,7 @@ class Robot(Base):
                 self.stop()
             else:
                 print("Successfully received a command from the server! (" + str(data) + ")")
-                self.commands_queue.put(data)
+                self.coordinates_queue.put(data)
                 return
         except:
             print("Failed to receive command from server!")
@@ -196,8 +194,7 @@ class Robot(Base):
         self.RUN = True
         while self.RUN:
             self.recv(1)
-            if (self.commands_queue.empty()) & (self.MANUAL == False):
-                self._createCommands()
+            self.move()
 
         self.recv(1)
 
@@ -315,10 +312,19 @@ class Robot(Base):
         self.sock.close()
 
 
-    def move(self, coordinate=None):
+    def move(self, coordinate=None, tempeture_check = True):
         """
-        Moves the robot to the first coordinate in the commands_queue, if it's empty and manual mode isn't activated
+        Moves the robot to the first coordinate in the coordinates_queue, if it's empty and manual mode isn't activated
         then it automatic creates a new command.
+
+        Parameters
+        ----------
+        coordinate(=None): Tuple
+            Coordinate to which the robot should move, if left empty the robots moves to the first coordinate in the
+            coordinate queue. It the queue is empty, the robot will automatic create a new coordinate.
+
+        tempeture_check(=True): boolean
+            A flag that indicates if the robot should preform a temperature check, by default true.
 
         Raises
         ------
@@ -329,12 +335,14 @@ class Robot(Base):
             If the input isn't in the format (x, y) or None, Exception is raised.
 
         """
+        tempeture_check_flag = True
+        cell_update_flag = True
         if coordinate == None:
-            if (self.commands_queue.empty()) & (self.MANUAL == False):
+            if (self.coordinates_queue.empty()) & (self.MANUAL == False):
                 self._create_auto_commands()
 
             try:
-                X, Y = self.commands_queue.get()
+                X, Y = self.coordinates_queue.get()
             except :
                 raise Exception("Wrong format of the coordinates from the server!")
         else:
@@ -343,6 +351,8 @@ class Robot(Base):
             except :
                 raise Exception("Wrong format of the input coordinates!")
 
+        print("The robot has started to move to: (" + X + ", " + Y + ")")
+
         if self.current_location_x < X:
             self.turn("east")
         else:
@@ -350,26 +360,40 @@ class Robot(Base):
 
         self.run()
         while (self.current_location_x != X):
-            if self.light_sensor.get_color() > 75:
+            if (self.light_sensor.get_color() > 75) & (cell_update_flag == True):
                 self._update_current_direction(self.current_direction)
-            else:
-                pass
+                if (tempeture_check == True) & (tempeture_check_flag == True):
+                    tempeture_check_flag = False
+                    tempeture = self.temperature_sensor.get_deg_c()
+                    if tempeture > 30:
+                        print("The temperature at the robots location is dangerously high (" + tempeture + " '\u2103')" )
+
+            elif (self.light_sensor.get_color() > 50) & (cell_update_flag == False):
+                tempeture_check_flag = True
+
+        self.brake()
 
         if self.current_location_y < Y:
             self.turn("south")
         else:
             self.turn("north")
 
-        self.brake()
-
         self.run()
-        while (self.current_location_y != Y):
-            if self.light_sensor.get_color() > 75:
+        while self.current_location_y != Y:
+            if (self.light_sensor.get_color() > 75) & (cell_update_flag == True):
                 self._update_current_direction(self.current_direction)
-            else:
-                pass
+                if (tempeture_check == True) & (tempeture_check_flag == True):
+                    tempeture_check_flag = False
+                    tempeture = self.temperature_sensor.get_deg_c()
+                    if tempeture > 30:
+                        print(
+                            "The temperature at the robots location is dangerously high (" + tempeture + " '\u2103')")
+
+                elif (self.light_sensor.get_color() > 50) & (cell_update_flag == False):
+                    tempeture_check_flag = True
 
         self.brake()
+        print("Robot has reaches it's destination at: (" + X + ", " + Y + ")")
 
     @property
     def serialize(self):
@@ -386,7 +410,7 @@ class Robot(Base):
         self.current_direction = current_direction
 
     def _create_auto_commands(self): # -- TODO: Add the automatic function.
-        self.commands_queue.put(5,5)
+        self.coordinates_queue.put(5, 5)
 
     def _update_current_direction(self, direction):
         if (direction == "north"):
