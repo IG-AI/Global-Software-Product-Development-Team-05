@@ -8,9 +8,19 @@ class Server:
 
     Methods
     -------
-    connect(self)
+    connect(self):
         Starts the server.
-    disconnect(self)
+    set_map(self, map):
+        Sets the layout map over the area the robots operates in.
+    get_robots(self):
+        Returns the list with connected robots.
+    get_clients(self):
+        Returns the list with connected clients.
+    start_robot(self, robot, time=None):
+        Starts a robot in a new thread, with the duration in seconds as a optional input (time).
+    stop_robot(self, robot):
+        Stops a specific robot as given in the input.
+    disconnect(self):
         Stops the server.
     """
     def __init__(self, host=socket.gethostbyname(socket.gethostname()), port=2526):
@@ -36,12 +46,14 @@ class Server:
             List with the connected clients IP addresses.
         robots : list of strings
             List with the connected robots IP addresses.
-        commandsQueuesList : list
+        commands_queues_list : list
             A list with the unique Queues for specific robots with manual commands to the robots.
         videostream : Video Stream
             The video stream from the camera.
-        socket : socket
-            The server socket.
+        map: Matrix
+            A matrix that represent the area the robots operates in.
+        sock : socket
+            The server sock.
         """
         self.RUN = True
         self.HOST = host
@@ -49,15 +61,15 @@ class Server:
 
         self.clients = []
         self.robots = []
-        self.commandsQueuesList = []
-        self.robotsManualMode = []
-        self.robotsStarted = []
+        self.commands_queues_list = []
+        self.robots_manual_mode = []
+        self.robots_started = []
         self.videostream = None
         self.map = None
 
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.bind((self.HOST, self.PORT))
-        self.socket.listen()
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.bind((self.HOST, self.PORT))
+        self.sock.listen()
 
     def __del__(self):
         """
@@ -78,7 +90,7 @@ class Server:
 
         Attributes
         ----------
-        socket: socket
+        sock: socket
             Socket for the connected component.
         address : string
             IP address for the connected component.
@@ -95,30 +107,30 @@ class Server:
         print("Server has started on IP: " + self.HOST + " and port: " + str(self.PORT))
         print("Starts listing to clients...")
         while self.RUN:
-            socket, address = self.socket.accept()
+            sock, address = self.sock.accept()
             try:
-                id = pickle.loads(socket.recv(4096))
+                id = pickle.loads(sock.recv(4096))
             except:
                 raise Exception("Failed to receive the client type!")
             try:
                 if id == 'robot':
                     print("Connecting to a robot at: " + str(address))
-                    _thread.start_new_thread(self._listenRobot, (socket,address))
+                    _thread.start_new_thread(self._listen_robot, (sock, address))
                     print("Connected to the robot!")
                 elif id == 'client':
                     print("Connecting to a client at: " + str(address))
-                    _thread.start_new_thread(self._listenClient, (socket,address))
+                    _thread.start_new_thread(self._listen_client, (sock, address))
                     print("Connected to a client!")
                 elif id == 'camera':
                     print("Connecting to the camera at: " + str(address))
-                    _thread.start_new_thread(self._listenCamera, (socket,))
+                    _thread.start_new_thread(self._listen_camera, (sock,))
                     print("Connected to the camera!")
                 else:
                     print("Unknown device trying to connect!")
             except:
                 raise Exception("Failed to establish new connection!")
 
-    def setMap(self, map):
+    def set_map(self, map):
         """
         Sets the map over the building the robot(s) should operate in.
 
@@ -129,21 +141,21 @@ class Server:
         """
         self.map = map
 
-    def getRobots(self):
+    def get_robots(self):
         """
         Returns the list with connected robots.
         """
         return self.robots
 
-    def getClients(self):
+    def get_clients(self):
         """
         Returns the list with connected clients.
         """
         return self.clients
 
-    def startRobot(self, robot, time=None):
+    def start_robot(self, robot, time=None):
         """
-        Starts a robot in a new thread
+        Starts a robot in a new thread, with the duration in seconds as a optional input (time).
 
         Parameters
         ----------
@@ -153,12 +165,12 @@ class Server:
             A optional input, if left the robot will continue until it receives a stop call. Otherwise ot will
             continue equal amout of time as set in the input or until receives a stop call.
         """
-        _thread.start_new_thread(self._startRobotAux, (robot, time))
+        _thread.start_new_thread(self._start_robot_aux, (robot, time))
 
-    def _startRobotAux(self, robot, time=None):
+    def _start_robot_aux(self, robot, time=None):
         """
         Starts a specific robot as given in the input. A second parameter is optional, if left then the robot continues
-        until a stopRobot(robot) has been called. If given as a an int, the robot will run for that amount of time.
+        until a stop_robot(robot) has been called. If given as a an int, the robot will run for that amount of time.
 
         Parameters
         ----------
@@ -176,22 +188,22 @@ class Server:
         if time == None:
             if robot in self.robots:
                 print("Starting up robot at: " + str(robot))
-                self.robotsStarted.append(robot)
+                self.robots_started.append(robot)
             else:
                 print("Robot: " + str(robot) + " isn't connected to the server!")
 
         elif type(time) == int:
             if robot in self.robots:
                 print("Starting up robot at: " + str(robot))
-                self.robotsStarted.append(robot)
+                self.robots_started.append(robot)
                 sleep(time)
-                self.stopRobot(robot)
+                self.stop_robot(robot)
             else:
                 print("Robot: " + str(robot) + " isn't connected to the server!")
         else:
             raise Exception("Invalid input! Input has to be an int.")
 
-    def stopRobot(self, robot):
+    def stop_robot(self, robot):
         """
         Stops a specific robot as given in the input.
 
@@ -200,9 +212,9 @@ class Server:
         robot: (string, int)
             A tuple with the IP address and port to the robot that should be started.
         """
-        if robot in self.robotsStarted:
+        if robot in self.robots_started:
             print("Turning off the robot  at: "+ str(robot))
-            self.robotsStarted.remove(robot)
+            self.robots_started.remove(robot)
         else:
             print("The robot: " + robot + " hasn't been started!")
 
@@ -213,9 +225,9 @@ class Server:
         print("Server closing down...")
         self.RUN = False
         sleep(1)
-        self.socket.close()
+        self.sock.close()
 
-    def _findCommandsQueue(self, address):
+    def _find_commands_queue(self, address):
         """
         Finds a unique commands queue for a specific robot.
 
@@ -224,13 +236,13 @@ class Server:
         address: string
             The address of the robot you want the commands queue for.
         """
-        for i in range(len(self.commandsQueuesList)):
-            if self.commandsQueuesList[i][0] == address:
+        for i in range(len(self.commands_queues_list)):
+            if self.commands_queues_list[i][0] == address:
                 index = i
 
         return index
 
-    def _listenRobot(self, robotsocket, address):
+    def _listen_robot(self, robotsocket, address):
         """
         Function for listing to a robot. It continues until either the server is shutting down or the current robot has
         shut down.
@@ -238,13 +250,13 @@ class Server:
         Parameters
         ----------
         robotsocket: socket
-            The socket for the incoming robot connection.
+            The sock for the incoming robot connection.
         address: Tuple of string and int
             A tuple with the IP address of the robot in the form of a string and a port number to the robot in the form
             of a int.
         """
         newQueue = (address, Queue())
-        self.commandsQueuesList.append(newQueue)
+        self.commands_queues_list.append(newQueue)
         self.robots.append(address)
         sentManualFlag = False
         sentStartFlag = False
@@ -260,51 +272,51 @@ class Server:
             except:
                 pass
 
-            if (address in self.robotsManualMode) & (sentManualFlag == False):
+            if (address in self.robots_manual_mode) & (sentManualFlag == False):
                 robotsocket.sendall(pickle.dumps("manual"))
                 sentAutoFlag = False
                 sentManualFlag = True
-            elif (address not in self.robotsManualMode) & (sentAutoFlag == False):
+            elif (address not in self.robots_manual_mode) & (sentAutoFlag == False):
                 robotsocket.sendall(pickle.dumps("auto"))
                 sentManualFlag = False
                 sentAutoFlag = True
             else:
                 pass
 
-            if (address in self.robotsStarted) & (sentStartFlag == False):
+            if (address in self.robots_started) & (sentStartFlag == False):
                 robotsocket.sendall(pickle.dumps("start"))
                 sentStopFlag = False
                 sentStartFlag = True
-            elif (address not in self.robotsStarted) & (sentStopFlag == False):
+            elif (address not in self.robots_started) & (sentStopFlag == False):
                 robotsocket.sendall(pickle.dumps("stop"))
                 sentStartFlag = False
                 sentStopFlag = True
             else:
                 pass
 
-            index = self._findCommandsQueue(address)
-            for i in range(self.commandsQueuesList[index][1].qsize()):
-                command = self.commandsQueuesList[index][1].get()
+            index = self._find_commands_queue(address)
+            for i in range(self.commands_queues_list[index][1].qsize()):
+                command = self.commands_queues_list[index][1].get()
                 try:
                     robotsocket.sendall(pickle.dumps(command))
                     print("Successfully sent a command (" + str(command) + ") to a robot at: " + str(address))
                 except:
                     pass
 
-        index = self._findCommandsQueue(address)
-        self.commandsQueuesList.pop(index)
+        index = self._find_commands_queue(address)
+        self.commands_queues_list.pop(index)
         try:
             self.robots.remove(address)
         except:
             pass
         try:
-            self.robotsManualMode.remove(address)
+            self.robots_manual_mode.remove(address)
         except:
             pass
         print("Disconnecting a robot at " + str(address) + "...")
         robotsocket.sendall(pickle.dumps("end"))
 
-    def _listenClient(self, clientsocket, address):
+    def _listen_client(self, clientsocket, address):
         """
         Function for listing to a client. It continues until either the server is shutting down or the current client
         has shut down.
@@ -312,7 +324,7 @@ class Server:
         Parameters
         ----------
         clientsocket: socket
-            The socket for the incoming client connection.
+            The sock for the incoming client connection.
         address: Tuple of string and int
             A tuple with the IP address of the client in the form of a string and a port number to the client in the
             form of a int.
@@ -332,7 +344,7 @@ class Server:
             elif command == "robotlist":
                 try:
                     print("Trying to send the robots list to " + str(address))
-                    clientsocket.sendall(pickle.dumps(self.getRobots()))
+                    clientsocket.sendall(pickle.dumps(self.get_robots()))
                     print("Successfully sent the robot list to: " + str(address))
                 except:
                     print("Failed to send robots list to: " + str(address))
@@ -353,13 +365,13 @@ class Server:
                     print("Manual Mode Activated for all robots!")
                     for i in range(len(self.robots)):
                         try:
-                            self.robotsManualMode.append(self.robots[i])
+                            self.robots_manual_mode.append(self.robots[i])
                         except:
                             pass
                 else:
                     print("Manual Mode Activated for a robot at: " + str(device))
                     try:
-                        self.robotsManualMode.append(device)
+                        self.robots_manual_mode.append(device)
                     except:
                         pass
 
@@ -368,17 +380,17 @@ class Server:
                     print("Auto Mode Activated for all robots!")
                     for i in range(len(self.robots)):
                         try:
-                            self.robotsManualMode.remove(self.robots[i])
+                            self.robots_manual_mode.remove(self.robots[i])
                         except:
                             pass
                 else:
                     print("Auto Mode Activated for a robot at: " + str(device))
-                    self.robotsManualMode.remove(device)
+                    self.robots_manual_mode.remove(device)
 
             else:
-                for i in range(len(self.commandsQueuesList)):
-                    if self.commandsQueuesList[i][0] == device:
-                        self.commandsQueuesList[i][1].put(command)
+                for i in range(len(self.commands_queues_list)):
+                    if self.commands_queues_list[i][0] == device:
+                        self.commands_queues_list[i][1].put(command)
                         print("Received " + str(command) + " to robot at " + str(device) + " from a client at: " + str(address))
 
         try:
@@ -389,7 +401,7 @@ class Server:
         print("Disconnecting a client at " + str(address) + "...")
         clientsocket.sendall(pickle.dumps("end"))
 
-    def _listenCamera(self, camerasocket):
+    def _listen_camera(self, camerasocket):
         """
         Function for listing to the camera. It continues until either the server is shutting down or the camera has
         shut down.
@@ -397,7 +409,7 @@ class Server:
         Parameters
         ----------
         camerasocket: socket
-            The socket for the incoming camera connection.
+            The sock for the incoming camera connection.
         address: Tuple of string and int
             A tuple with the IP address of the camera in the form of a string and a port number to the camera in the
             form of a int.
@@ -420,10 +432,10 @@ if __name__ == "__main__":
     while True:
         sleep(1)
         if (len(server.robots) > 0) & (startFlag == False):
-            server.startRobot(server.robots[0], 120)
+            server.start_robot(server.robots[0], 120)
             startFlag = True
 
         elif (len(server.robots) > 1) & (startFlag2 == False):
-            server.startRobot(server.robots[1], 120)
+            server.start_robot(server.robots[1], 120)
             startFlag2 = True
 

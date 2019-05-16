@@ -91,7 +91,7 @@ def command_direct():
             #PAcket code goes there
     except Exception:
         return jsonify({'message': 'Invalid data'}), 404
-    robot.move(new_direction)
+    robot._update_current_direction(new_direction)
     robot.save_to_db()
     return "Successful"
 

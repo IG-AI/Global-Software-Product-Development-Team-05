@@ -17,10 +17,22 @@ class Robot(Base):
 
     Methods
     -------
-    connect(self)
+    connect(self):
         Connects the robot to the server.
     recv(self, command):
         Tries to receive a command form the server.
+    start(self):
+        Function that starts the robot in a new thread.
+    stop(self):
+        Function that stops the robot.
+    turn(self, direction):
+        Turns the robot 90 degrees, either to left or right based on the input which should be left or right.
+    run(self, speed=64):
+        Starts the motors, with the speed as the input, as the default 64.
+    start(self):
+        Function that starts the robot in a new thread.
+    brake(self):
+        Stops the robots motors.
     disconnect(self)
         Disconnects the robot to the server.
     """
@@ -49,36 +61,49 @@ class Robot(Base):
             The servers host address.
         SERVER_PORT : int
             The servers port number.
-        socket : socket
-            The robot socket.
-        commandsQueue : Queue
+        MANUAL: boolean
+            Flag that's indicates if the robot is in manual mode.
+        RUN: bollean
+            Flag that's indicates if the robot is running.
+        brick: brick
+            The LEGO brick object.
+        left_motor: Motor
+            Motor object that controls the left motor of the robot.
+        right_motor: Motor
+            Motor object that controls the right motor of the robot.
+        light_sensor: Color20
+            Light sensor object for the robot.
+        temperature_sensor: Temperature
+            Temperature sensor object for the robot.
+        sock : socket
+            The robot sock.
+        commands_queue : Queue
             A queue with commands for the robot.
         """
         self.SERVER_HOST = host
         self.SERVER_PORT = port
         self.MANUAL = False
         self.RUN = False
-        self.BRICK = nxt.locator.find_one_brick(name = 'MyRobot')
-        self.brickName, self.brickHost, self.brickSignalStrength, self.brickUserFlash = self.BRICK.get_device_info()
-        self.LEFT_MOTOR = nxt.Motor(self.BRICK, PORT_A)
-        self.RIGHT_MOTOR = nxt.Motor(self.BRICK, PORT_B)
-        self.LIGHT_SENSOR = nxt.Color20(self.BRICK, PORT_C)
-        self.LIGHT_SENSOR.set_light_color(nxt.Type.COLORRED)
-        self.TEMPERATURE_SENSOR = nxt.Temperature(self.BRICK, PORT_D)
-        self.POS = pos
+        self.brick = nxt.locator.find_one_brick(name ='MyRobot')
+        self.brick_name, self.brick_host, self.brick_signal_strength, self.brick_user_flash = self.brick.get_device_info()
+        self.left_motor = nxt.Motor(self.brick, PORT_A)
+        self.right_motor = nxt.Motor(self.brick, PORT_B)
+        self.light_sensor = nxt.Color20(self.brick, PORT_C)
+        self.light_sensor.set_light_color(nxt.Type.COLORRED)
+        self.temperature_sensor = nxt.Temperature(self.brick, PORT_D)
         self.id = id
         self.role = role
         self.current_location_x = current_location_x
         self.current_location_y = current_location_y
         self.current_direction = current_direction
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.commandsQueue = Queue()
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.commands_queue = Queue()
 
     def __del__(self):
         """
         Disconnects the robot if the robot object is removed.
         """
-        self.socket.close()
+        self.sock.close()
 
     def connect(self):
         """
@@ -91,8 +116,8 @@ class Robot(Base):
         """
         try:
             print("Connecting to server on IP: " + str(self.SERVER_HOST) + " and port: " + str(self.SERVER_PORT))
-            self.socket.connect((self.SERVER_HOST, self.SERVER_PORT))
-            self.socket.sendall(pickle.dumps('robot'))
+            self.sock.connect((self.SERVER_HOST, self.SERVER_PORT))
+            self.sock.sendall(pickle.dumps('robot'))
             self.RUN = True
 
             self.recv(1)
@@ -119,20 +144,20 @@ class Robot(Base):
         if (type(amount) == int) | (amount == None):
             if amount == None:
                 while True:
-                    self._recvAux()
+                    self._recv_aux()
             else:
                 for i in range(amount):
-                    self._recvAux()
+                    self._recv_aux()
         else:
             raise Exception("Invalid input! Input has to be an int.")
 
-    def _recvAux(self):
+    def _recv_aux(self):
         """
         Aux function to the recv function.
         """
         try:
             print("Trying to receive a new command from server...")
-            data = pickle.loads(self.socket.recv(4096))
+            data = pickle.loads(self.sock.recv(4096))
             if data == "end":
                 self.RUN = False
                 self.disconnect()
@@ -145,13 +170,13 @@ class Robot(Base):
                 self.MANUAL = False
             elif data == "start":
                 print("Robot started!")
-                _thread.start_new_thread(self._startAux(), ())
+                _thread.start_new_thread(self._start_aux(), ())
             elif data == "stop":
                 print("Robot stopped!")
                 self.stop()
             else:
                 print("Successfully received a command from the server! (" + str(data) + ")")
-                self.commandsQueue.put(data)
+                self.commands_queue.put(data)
                 return
         except:
             print("Failed to receive command from server!")
@@ -159,19 +184,19 @@ class Robot(Base):
 
     def start(self):
         """
-        Function that starts the robot.
+        Function that starts the robot in a new thread.
         """
-        _thread.start_new_thread(self._startAux(), ())
+        _thread.start_new_thread(self._start_aux(), ())
 
-    def _startAux(self):
+    def _start_aux(self):
         """
         Aux function to the start function.
         """
-        self.BRICK.play_tone_and_wait(500, 5)
+        self.brick.play_tone_and_wait(500, 5)
         self.RUN = True
         while self.RUN:
             self.recv(1)
-            if (self.commandsQueue.empty()) & (self.MANUAL == False):
+            if (self.commands_queue.empty()) & (self.MANUAL == False):
                 self._createCommands()
 
         self.recv(1)
@@ -180,7 +205,7 @@ class Robot(Base):
         """
         Function that stops the robot.
         """
-        self.BRICK.play_tone_and_wait(300, 5)
+        self.brick.play_tone_and_wait(300, 5)
         self.RUN = False
 
     def turn(self, direction):
@@ -189,22 +214,65 @@ class Robot(Base):
 
         Parameters
         ----------
-        direction ("left"/"right): string
-            The direction the robot should turn.
+        direction: string
+            The cardinal direction the robot should face.
 
         Raises
         ------
             Exception:
-                If the input isn't "left" or "right", Exception is raised.
+                If the input isn't either east, west, north or south, Exception is raised.
         """
-        if direction == 'left':
-            self.LEFT_MOTOR.turn(64, 90)
-            self.RIGHT_MOTOR.turn(-64, 90)
-        elif direction == 'right':
-            self.LEFT_MOTOR.turn(-64, 90)
-            self.RIGHT_MOTOR.turn(64, 90)
+        if (direction == "west") | (direction == "east") | (direction == "north") | (direction == "south"):
+            if self.current_direction != direction:
+                if self.current_direction == "west":
+                    if direction == "east":
+                        self.left_motor.turn(64, 180)
+                        self.right_motor.turn(-64, 180)
+                    elif direction == "north":
+                        self.left_motor.turn(64, 90)
+                        self.right_motor.turn(-64, 90)
+                    elif direction == "south":
+                        self.left_motor.turn(-64, 90)
+                        self.right_motor.turn(64, 90)
+
+                elif self.current_direction == "east":
+                    if direction == "west":
+                        self.left_motor.turn(64, 180)
+                        self.right_motor.turn(-64, 180)
+                    elif direction == "north":
+                        self.left_motor.turn(64, 90)
+                        self.right_motor.turn(-64, 90)
+                    elif direction == "south":
+                        self.left_motor.turn(-64, 90)
+                        self.right_motor.turn(64, 90)
+
+                elif self.current_direction == "north":
+                    if direction == "west":
+                        self.left_motor.turn(64, 90)
+                        self.right_motor.turn(-64, 90)
+                    elif direction == "east":
+                        self.left_motor.turn(-64, 90)
+                        self.right_motor.turn(64, 90)
+                    elif direction == "south":
+                        self.left_motor.turn(64, 90)
+                        self.right_motor.turn(-64, 180)
+
+                elif self.current_direction == "south":
+                        if direction == "west":
+                            self.left_motor.turn(-64, 90)
+                            self.right_motor.turn(64, 90)
+                        elif direction == "east":
+                            self.left_motor.turn(64, 90)
+                            self.right_motor.turn(-64, 90)
+                        elif direction == "north":
+                            self.left_motor.turn(-64, 180)
+                            self.right_motor.turn(64, 180)
+
+                self.current_direction = direction
+            else:
+                pass
         else:
-            raise Exception("The wheels can only turn either left or right!")
+            raise Exception("The direction has to be a string with either west, east, north and south!")
 
     def run(self, speed=64):
         """
@@ -217,12 +285,15 @@ class Robot(Base):
 
         Raises
         ------
-            Exception:
-                If the input isn't an int, Exception is raised.
+        Exception:
+            If the input isn't an int, Exception is raised.
         """
         if type(speed) is int:
-            self.LEFT_MOTOR.run(speed)
-            self.RIGHT_MOTOR.run(speed)
+            if self.left_motor.idle():
+                self.left_motor.run(speed)
+                self.right_motor.run(speed)
+            else:
+                pass
         else:
             raise Exception("The speed has to be an int!")
 
@@ -230,54 +301,75 @@ class Robot(Base):
         """
         Breaks the robots movement.
         """
-        self.LEFT_MOTOR.brake()
-        self.RIGHT_MOTOR.brake()
+        self.left_motor.brake()
+        self.right_motor.brake()
 
     def disconnect(self):
         """
         Closing down the connection between the robot and the server.
         """
         print("Robot disconnecting...")
-        self.socket.sendall(pickle.dumps("end"))
+        self.sock.sendall(pickle.dumps("end"))
         sleep(1)
-        self.BRICK.sock.close()
-        self.socket.close()
+        self.brick.sock.close()
+        self.sock.close()
 
-    def updatePos(self):
-        if not self.commandsQueue.empty():
-            newPos = self.commandsQueue.get()
-            X, Y = self.POS
-            newX, newY = newPos
-            x_position = 'right'        # keep the x direction to know where to turn in the y axis
 
-            if self.POS == newPos:
-                print("Robot reached it destination at: " + self.POS)
-                self.brake()
+    def move(self, coordinate=None):
+        """
+        Moves the robot to the first coordinate in the commands_queue, if it's empty and manual mode isn't activated
+        then it automatic creates a new command.
+
+        Raises
+        ------
+        Exception:
+            If the command isn't in the format (x, y), Exception is raised.
+
+        Exception:
+            If the input isn't in the format (x, y) or None, Exception is raised.
+
+        """
+        if coordinate == None:
+            if (self.commands_queue.empty()) & (self.MANUAL == False):
+                self._create_auto_commands()
+
+            try:
+                X, Y = self.commands_queue.get()
+            except :
+                raise Exception("Wrong format of the coordinates from the server!")
+        else:
+            try:
+                X, Y = coordinate
+            except :
+                raise Exception("Wrong format of the input coordinates!")
+
+        if self.current_location_x < X:
+            self.turn("east")
+        else:
+            self.turn("west")
+
+        self.run()
+        while (self.current_location_x != X):
+            if self.light_sensor.get_color() > 75:
+                self._update_current_direction(self.current_direction)
             else:
-                # TODO: where does the robot look? Maybe it does not need to turn!
-                if newX > X:
-                    self.turn('right')
-                elif newX < X:
-                    self.turn('left')
-                    x_position = 'left'
+                pass
 
-                while any(self.POS != newX, Y):
-                    self.run()
-                self.stop()
+        if self.current_location_y < Y:
+            self.turn("south")
+        else:
+            self.turn("north")
 
-                if newY > Y:
-                    if x_position == 'right':
-                        self.turn('left')
-                    else:
-                        self.turn('right')
-                elif newY < Y:
-                    if x_position == 'right':
-                        self.turn('right')
-                    else:
-                        self.turn('left')
-                while any(self.POS != newX, newY):
-                    self.run()
-                self.stop()
+        self.brake()
+
+        self.run()
+        while (self.current_location_y != Y):
+            if self.light_sensor.get_color() > 75:
+                self._update_current_direction(self.current_direction)
+            else:
+                pass
+
+        self.brake()
 
     @property
     def serialize(self):
@@ -293,7 +385,10 @@ class Robot(Base):
         self.current_location_y = current_location_y
         self.current_direction = current_direction
 
-    def move(self, direction):
+    def _create_auto_commands(self): # -- TODO: Add the automatic function.
+        self.commands_queue.put(5,5)
+
+    def _update_current_direction(self, direction):
         if (direction == "north"):
             self.current_location_y += 1
         elif (direction == "east"):

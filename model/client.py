@@ -8,11 +8,15 @@ class Client:
 
     Methods
     -------
-    connect(self)
+    connect(self):
         Connects the client to the server.
-    send(self, command):
-        Tries to send a command for the robot(s) to the server.
-    disconnect(self)
+    send_command(self, command, robot=None):
+        Tries to send a command for either a specific robot or to all robots if robot=None through the server.
+    activate_manual_mode(self, robot=None):
+        Activates manual mode for either a specific robot or to all robots if robot=None through the server.
+    deactivate_manual_mode(self, robot=None):
+        Dectivates manual mode for either a specific robot or to all robots if robot=None through the server.
+    disconnect(self):
         Disconnects the client to the server.
     """
     def __init__(self, host='127.0.1.1', port=2526):
@@ -30,26 +34,26 @@ class Client:
         ----------
         SERVER_HOST: string
             The servers host address.
-        SERVER_PORT : int
+        SERVER_PORT: int
             The servers port number.
-        socket : socket
-            The client socket.
-        commandsQueue : Queue
+        sock: socket
+            The client sock.
+        commands_queue: Queue
             A queue with commands for the robot(s).
         """
         self.SERVER_HOST = host
         self.SERVER_PORT = port
-        self.SERVER_ROBOTSLIST = []
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.socket.settimeout(10)
+        self.server_robots_list = []
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.sock.settimeout(10)
         self.map = None
-        self.commandsQueue = Queue()
+        self.commands_queue = Queue()
 
     def __del__(self):
         """
         Disconnects the client if the client object is removed.
         """
-        self.socket.close()
+        self.sock.close()
 
     def connect(self):
         """
@@ -62,15 +66,15 @@ class Client:
         """
         try:
             print("Connecting to server on IP: " + str(self.SERVER_HOST) + " and port: " + str(self.SERVER_PORT))
-            self.socket.connect((self.SERVER_HOST, self.SERVER_PORT))
-            self.socket.sendall(pickle.dumps('client'))
-            self._updateRobotsList()
-            self._updateMap()
+            self.sock.connect((self.SERVER_HOST, self.SERVER_PORT))
+            self.sock.sendall(pickle.dumps('client'))
+            self._update_robots_list()
+            self._update_map()
         except:
             raise Exception("The client couldn't connect to the server!")
 
 
-    def sendCommand(self, command, robot=None):
+    def send_command(self, command, robot=None):
         """
         Sending a new command for the robot(s) through the server.
 
@@ -82,12 +86,12 @@ class Client:
             Address in the the form (IP, PORT) for the robot how should receive the command. If None, then the command
             will be sent to all connected robots.
         """
-        self._updateRobotsList()
-        if len(self.SERVER_ROBOTSLIST) > 0:
-            if (robot != None) & (robot in self.SERVER_ROBOTSLIST):
+        self._update_robots_list()
+        if len(self.server_robots_list) > 0:
+            if (robot != None) & (robot in self.server_robots_list):
                 try:
-                    self.socket.settimeout(1)
-                    stop = pickle.loads(self.socket.recv(4096))
+                    self.sock.settimeout(1)
+                    stop = pickle.loads(self.sock.recv(4096))
                     if stop == "end":
                         self.disconnect()
                         return
@@ -99,8 +103,8 @@ class Client:
                 else:
                     print("Trying to send a new command (" + str(command) + ") to a robot at: " + str(robot))
                 try:
-                    self._setCommand(command)
-                    self.socket.sendall(pickle.dumps((robot, self.commandsQueue.get())))
+                    self._set_command(command)
+                    self.sock.sendall(pickle.dumps((robot, self.commands_queue.get())))
                 except:
                     print("Couldn't send to server, the server is probably disconnected.")
                     self.disconnect()
@@ -112,7 +116,7 @@ class Client:
         else:
             print("There isn't any robots connected to the server!")
 
-    def activateManualMode(self, robot=None):
+    def activate_manual_mode(self, robot=None):
         """
         Activates manual mode for a robot(s), so it starts to only listing for commands from clients.
 
@@ -123,8 +127,8 @@ class Client:
             the command will be sent to all connected robots.
         """
         try:
-            self.socket.settimeout(1)
-            stop = pickle.loads(self.socket.recv(4096))
+            self.sock.settimeout(1)
+            stop = pickle.loads(self.sock.recv(4096))
             if stop == "end":
                 self.disconnect()
                 return
@@ -133,15 +137,15 @@ class Client:
 
         if robot == None:
             print("Activating manual mode for all robots!")
-            self._updateRobotsList()
-            for i in range(len(self.SERVER_ROBOTSLIST)):
-                self.socket.sendall(pickle.dumps((self.SERVER_ROBOTSLIST[i], "manual")))
+            self._update_robots_list()
+            for i in range(len(self.server_robots_list)):
+                self.sock.sendall(pickle.dumps((self.server_robots_list[i], "manual")))
         else:
             print("Activating manual mode for a robot at : " + str(robot))
-            self._updateRobotsList()
-            self.socket.sendall(pickle.dumps((robot, "manual")))
+            self._update_robots_list()
+            self.sock.sendall(pickle.dumps((robot, "manual")))
 
-    def deactivateManualMode(self, robot=None):
+    def deactivate_manual_mode(self, robot=None):
         """
         Deactivates manual mode for a robot(s), so it starts moving automatically.
 
@@ -152,8 +156,8 @@ class Client:
             the command will be sent to all connected robots.
         """
         try:
-            self.socket.settimeout(1)
-            stop = pickle.loads(self.socket.recv(4096))
+            self.sock.settimeout(1)
+            stop = pickle.loads(self.sock.recv(4096))
             if stop == "end":
                 self.disconnect()
                 return
@@ -162,12 +166,12 @@ class Client:
 
         if robot == None:
             print("Deactivating manual mode for all robots!")
-            self._updateRobotsList()
-            for i in range(len(self.SERVER_ROBOTSLIST)):
-                self.socket.sendall(pickle.dumps((self.SERVER_ROBOTSLIST[i], "auto")))
+            self._update_robots_list()
+            for i in range(len(self.server_robots_list)):
+                self.sock.sendall(pickle.dumps((self.server_robots_list[i], "auto")))
         else:
             print("Deactivating manual mode for a robot at : " + str(robot))
-            self.socket.sendall(pickle.dumps((robot, "auto")))
+            self.sock.sendall(pickle.dumps((robot, "auto")))
 
     def disconnect(self):
         """
@@ -175,74 +179,74 @@ class Client:
         """
         print("Client disconnecting...")
         sleep(1)
-        self.socket.sendall(pickle.dumps((self.socket.getsockname(), "end")))
-        self.socket.close()
+        self.sock.sendall(pickle.dumps((self.sock.getsockname(), "end")))
+        self.sock.close()
 
-    def _setCommand(self, command):
+    def _set_command(self, command):
         """
-        Setting a new command for the robot(s) in the commandsQueue.
+        Setting a new command for the robot(s) in the commands_queue.
 
         Parameters
         ----------
         command: string
             The new command for the robot(s).
         """
-        self.commandsQueue.put(command)
+        self.commands_queue.put(command)
 
-    def _updateRobotsList(self):
+    def _update_robots_list(self):
         """
-        Updates the robots list with help of of the _recvRobots function.
+        Updates the robots list with help of of the _recv_robots function.
         """
-        self.SERVER_ROBOTSLIST = self._recvRobots()
+        self.server_robots_list = self._recv_robots()
 
 
-    def _recvRobots(self):
+    def _recv_robots(self):
         """
         Receive the robots list from the server.
         """
         try:
-            self.socket.settimeout(1)
-            stop = pickle.loads(self.socket.recv(4096))
+            self.sock.settimeout(1)
+            stop = pickle.loads(self.sock.recv(4096))
             if stop == "end":
                 self.disconnect()
                 return []
         except:
             pass
 
-        self.socket.sendall(pickle.dumps((None, "robotlist")))
+        self.sock.sendall(pickle.dumps((None, "robotlist")))
 
         try:
             print("Trying to receive robot list from server...")
             sleep(1)
-            robotlist = pickle.loads(self.socket.recv(4096))
+            robotlist = pickle.loads(self.sock.recv(4096))
             print("Successfully received robot list from server!")
             return robotlist
         except:
              print("Failed to receive robot list from server...")
              return []
 
-    def _updateMap(self):
-        self.map = self._recvMap()
+    def _update_map(self):
+        self.map = self._recv_map()
 
-    def _recvMap(self):
+    def _recv_map(self):
         """
         Receive the map from the server.
         """
         try:
-            self.socket.settimeout(1)
-            stop = pickle.loads(self.socket.recv(4096))
+            self.sock.settimeout(1)
+            stop = pickle.loads(self.sock.recv(4096))
             if stop == "end":
                 self.disconnect()
                 return []
         except:
             pass
 
-        self.socket.sendall(pickle.dumps((None, "map")))
+        self.sock.sendall(pickle.dumps((None, "map")))
 
         try:
             print("Trying to receive map from server...")
             sleep(1)
-            map = pickle.loads(self.socket.recv(4096))
+            map = pickle.loads(self.sock.recv(4096))
             print("Successfully received map from server!")
             return map
         except:
@@ -253,8 +257,8 @@ class Client:
 if __name__ == "__main__":
     client = Client()
     client.connect()
-    client.activateManualMode()
-    if len(client.SERVER_ROBOTSLIST) > 0:
-        client.sendCommand('1', client.SERVER_ROBOTSLIST[random.randint(0, 1)])
-    client.deactivateManualMode()
+    client.activate_manual_mode()
+    if len(client.server_robots_list) > 0:
+        client.send_command('1', client.server_robots_list[random.randint(0, 1)])
+    client.deactivate_manual_mode()
     client.disconnect()
