@@ -10,6 +10,8 @@ from model.account import Account
 from model.adrress import Address
 from util.direction import changing_direction, get_turning
 from util.echo_client import send
+from controller.robot_controller import process_map
+from util.write_read_map import save, load
 
 HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
 PORT = 65432
@@ -25,19 +27,11 @@ relative_move_able = {
     "south": 1,
     "west": 1
 }
-map = 'E E E E E\nE E E E E\nE E E E E\nE E E E E'
+
 
 legos = Blueprint('lego',__name__)
 
-def process_map(map, x, y, shell):
-    #global map
-    line = map.splitlines()
-    br = line[-y-1].split(' ')
-    br[x] = shell
-    line[-y-1] = ' '.join(br)
-    map = '\n'.join(line)
-    print(map)
-    return map
+
 
 def detect_moveable(coordinate_x, coordinate_y, request_direction_absolute):
     halt = 0
@@ -74,7 +68,8 @@ def detect_moveable(coordinate_x, coordinate_y, request_direction_absolute):
 
 @legos.route("/lego", methods = ['POST'])
 def log():
-    global map
+    #global map
+    map = load()
     request_data = request.get_data()
     print(request_data)
     data = json.loads(request_data) 
@@ -106,18 +101,21 @@ def log():
             
             #Robot read map and send move direction relative to coordinate
             #Server calculate which direction relative to robot facing need to perform so absolute move direction can be achieved
+            print(map)
             map = process_map(map, robot.current_location_x, robot.current_location_y, 'E')
             relative_direction = get_turning(robot.current_direction, absolute_direction)
             message = bytes(relative_direction, 'utf-8')
             send (addr, PORT, message)
-        map_send = map
-        print(map_send)
-        robot.move(absolute_direction)
-        robot.save_to_db()
-        map = process_map(map, robot.current_location_x, robot.current_location_y, 'O')
-        map_send = process_map(map_send, robot.current_location_x, robot.current_location_y, 'R')
-        map_send = 'map:' + map_send
-        send(addr, PORT, bytes(map_send, 'utf-8'))
+            map_send = map
+            print(map_send)
+            robot.move(absolute_direction)
+            robot.save_to_db()
+            map = process_map(map, robot.current_location_x, robot.current_location_y, 'O')
+            save(map)
+            map_send = process_map(map_send, robot.current_location_x, robot.current_location_y, 'R')
+            map_send = process_map(map_send, robot.current_goal_x, robot.current_goal_y, 'G')
+            map_send = 'map:' + map_send
+            send(addr, PORT, bytes(map_send, 'utf-8'))
         #Processing map change robot's position and goal       
         #send(address.host, PORT, map)
         #Update map and robot position in database

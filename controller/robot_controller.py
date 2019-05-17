@@ -10,7 +10,9 @@ from model.account import Account
 from model.adrress import Address
 from util.direction import changing_direction
 from util.echo_client import send
-from controller.lego_controller import map, process_map
+from util.write_read_map import save, load
+
+#map = 'E E E E E\nE E E E E\nE E E E E\nE E E E E'
 
 #HOST = '127.0.0.1'  # Standard loopback interface address (localhost)
 PORT = 65432
@@ -37,10 +39,20 @@ def convert_map(map):
     map = '\n'.join(line)
     return map
 
+def process_map(map, x, y, shell):
+    #global map
+    line = map.splitlines()
+    br = line[-y-1].split(' ')
+    br[x] = shell
+    line[-y-1] = ' '.join(br)
+    map = '\n'.join(line)
+    print(map)
+    return map
+
 @robots.route("/api/map", methods = ['POST'])
 @pre_authorized
 def receive_map():
-    global map
+    #global map
     data = request.get_data()    
     data = json.loads(data)    
     message = data['map']    
@@ -55,10 +67,11 @@ def receive_map():
         address = Address.find_by_id(robot_id)
         if not address:
             return jsonify({'message': 'Robot did not register host'}), 404 
-        print(map)
+        #print(map)
         map = message
         map = convert_map(map)
         print(map)
+        save(map)
         message = 'map:' + message   
         message = bytes(message, 'utf-8')   
         send(address.host, PORT, message)
@@ -85,6 +98,7 @@ def command_auto():
         address = Address.find_by_id(robot_id)
         if not address:
             return jsonify({'message': 'Robot did not register host'}), 404 
+        print(address.host)
         send(address.host, PORT, message)
         #PAcket code goes there
     except Exception:
@@ -133,11 +147,13 @@ def command_direct():
     except Exception:
         return jsonify({'message': 'Invalid data'}), 404
     #Update map
-    global map
+    #global map
+    map = load()
     map = process_map(map, robot.current_location_x, robot.current_location_y, 'E')
     robot.move(new_direction)
     robot.save_to_db()
     map = process_map(map, robot.current_location_x, robot.current_location_y, 'O')
+    save(map)
     return "Successful"
 
 @robots.route("/api/position", methods = ['GET'])

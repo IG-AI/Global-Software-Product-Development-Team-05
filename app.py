@@ -20,6 +20,7 @@ cors = CORS(send_wildcard=True)
 cors.init_app(app)
 
 if __name__ == '__main__':
+    #global map
     DB.init_app(app)
     with app.app_context():
         DB.create_all()
