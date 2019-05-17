@@ -1,6 +1,7 @@
 from queue import Queue
 from time import sleep
 import socket, pickle, _thread
+import util.pathfinding
 
 class Server:
     """
@@ -66,7 +67,6 @@ class Server:
         self.robots_started = []
         self.videostream = None
         self.map = None
-
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.bind((self.HOST, self.PORT))
         self.sock.listen()
@@ -242,6 +242,25 @@ class Server:
 
         return index
 
+    def _find_robot(self, robot):
+        """
+        Finds a robot in the robot list.
+
+        Parameters
+        ----------
+        address: string
+            The address of the robot you want.
+        """
+        for i in range(len(self.commands_queues_list)):
+            if self.robots[i][0] == robot:
+                index = i
+
+        return index
+
+    def _createCommand(self, robot): # - TODO: Create AI
+        self.commands_queues_list[len(self.commands_queues_list)][0] = robot
+        self.commands_queues_list[len(self.commands_queues_list)][0] = (2,2) #This should be calculated.
+
     def _listen_robot(self, robotsocket, address):
         """
         Function for listing to a robot. It continues until either the server is shutting down or the current robot has
@@ -257,10 +276,8 @@ class Server:
         """
         newQueue = (address, Queue())
         self.commands_queues_list.append(newQueue)
-        self.robots.append(address)
-        sentManualFlag = False
+        self.robots.append([address, (1,1)])
         sentStartFlag = False
-        sentAutoFlag = None
         sentStopFlag = None
         while self.RUN:
             sleep(1)
@@ -272,15 +289,12 @@ class Server:
             except:
                 pass
 
-            if (address in self.robots_manual_mode) & (sentManualFlag == False):
-                robotsocket.sendall(pickle.dumps("manual"))
-                sentAutoFlag = False
-                sentManualFlag = True
-            elif (address not in self.robots_manual_mode) & (sentAutoFlag == False):
-                robotsocket.sendall(pickle.dumps("auto"))
-                sentManualFlag = False
-                sentAutoFlag = True
-            else:
+            try:
+                if data[0] == "pos":
+                    self.robots[self._find_robot(address)][1] = data[1]
+
+
+            except:
                 pass
 
             if (address in self.robots_started) & (sentStartFlag == False):
@@ -295,13 +309,17 @@ class Server:
                 pass
 
             index = self._find_commands_queue(address)
-            for i in range(self.commands_queues_list[index][1].qsize()):
-                command = self.commands_queues_list[index][1].get()
-                try:
-                    robotsocket.sendall(pickle.dumps(command))
-                    print("Successfully sent a command (" + str(command) + ") to a robot at: " + str(address))
-                except:
-                    pass
+
+            if self.commands_queues_list[index].empty():
+                self._createCommand(address)
+
+            command = self.commands_queues_list[index][1].get()
+            direction = util.pathfinding(command)
+            while direction != "goal":
+                    robotsocket.sendall(pickle.dumps(direction))
+                    print("Successfully sent a direction (" + str(direction) + ") to a robot at: " + str(address))
+                    command = self.commands_queues_list[index][1].get()
+                    direction = util.pathfinding(command)
 
         index = self._find_commands_queue(address)
         self.commands_queues_list.pop(index)
@@ -389,8 +407,8 @@ class Server:
 
             else:
                 for i in range(len(self.commands_queues_list)):
-                    if self.commands_queues_list[i][0] == device:
-                        self.commands_queues_list[i][1].put(command)
+                    if self.commands_queues_list[i].put(device):
+                        self.commands_queues_list[i].put(command)
                         print("Received " + str(command) + " to robot at " + str(device) + " from a client at: " + str(address))
 
         try:

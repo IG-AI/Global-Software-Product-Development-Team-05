@@ -38,8 +38,8 @@ class Client:
             The servers port number.
         sock: socket
             The client sock.
-        coordinates_queue: Queue
-            A queue with coordinates that a robot(s) should move towards.
+        direction_queue: Queue
+            A queue with coordinates that a robot(s) should move_to_coords towards.
         """
         self.SERVER_HOST = host
         self.SERVER_PORT = port
@@ -184,7 +184,7 @@ class Client:
 
     def _set_command(self, command):
         """
-        Setting a new command for the robot(s) in the coordinates_queue.
+        Setting a new command for the robot(s) in the direction_queue.
 
         Parameters
         ----------
