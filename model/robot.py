@@ -1,5 +1,5 @@
 import random
-import socket, pickle, _thread
+import socket, pickle, _thread, serial
 from queue import Queue
 from time import sleep
 from db import DB
@@ -88,9 +88,10 @@ class Robot(Base):
         self.brick_name, self.brick_host, self.brick_signal_strength, self.brick_user_flash = self.brick.get_device_info()
         self.left_motor = nxt.Motor(self.brick, PORT_A)
         self.right_motor = nxt.Motor(self.brick, PORT_B)
-        self.light_sensor = nxt.Color20(self.brick, PORT_C)
+        self.arm_motor = nxt.Motor(self.brick, PORT_C)
+        self.light_sensor = nxt.Color20(self.brick, PORT_D)
         self.light_sensor.set_light_color(nxt.Type.COLORRED)
-        self.temperature_sensor = nxt.Temperature(self.brick, PORT_D)
+        self.temperature_sensor = Temperature()
         self.id = id
         self.role = role
         self.assign_coordinate(current_location_x, current_location_y, current_direction)
@@ -364,7 +365,7 @@ class Robot(Base):
                 self._update_current_direction(self.current_direction)
                 if (tempeture_check == True) & (tempeture_check_flag == True):
                     tempeture_check_flag = False
-                    tempeture = self.temperature_sensor.get_deg_c()
+                    tempeture = self.temperature_sensor.get_temperature()
                     if tempeture > 30:
                         print("The temperature at the robots location is dangerously high (" + tempeture + " '\u2103')" )
 
@@ -384,7 +385,7 @@ class Robot(Base):
                 self._update_current_direction(self.current_direction)
                 if (tempeture_check == True) & (tempeture_check_flag == True):
                     tempeture_check_flag = False
-                    tempeture = self.temperature_sensor.get_deg_c()
+                    tempeture = self.temperature_sensor.get_temperature()
                     if tempeture > 30:
                         print(
                             "The temperature at the robots location is dangerously high (" + tempeture + " '\u2103')")
@@ -430,3 +431,41 @@ class Robot(Base):
     def find_by_id(cls, id):
         packet = cls.query.filter_by(id = id).first()
         return packet
+
+class Temperature:
+    """
+    A class which handles an Arduino temperature sensor.
+
+    Methods
+    -------
+    get_temperature(self):
+        Returns the current temperature reading from the Arduino temperature sensor.
+    """
+    def __init__(self, port=9600):
+        """
+        Initializes the temperature sensor.
+
+        port: int or string
+            The port where the Arduino temperature sensor is connected to.
+        """
+        self.temp = None
+        self.serial = serial.Serial(port)
+        self.serial.open()
+
+    def get_temperature(self):
+        """
+        Reads and returns the temperature reading from the sensor.
+
+        Raises
+        ------
+        Exception:
+            If the sensor can't read the temperature, Exception is raised.
+        """
+        try:
+            self.temp = self.serial.read()
+            return self.temp
+        except:
+            raise Exception("Couldn't read the temperature!")
+
+    def __del__(self):
+        self.serial.close()
