@@ -1,13 +1,15 @@
+# ------------------------------------------------------------------------------
 # Sample code from https://www.redblobgames.com/pathfinding/a-star/
 # Copyright 2014 Red Blob Games <redblobgames@gmail.com>
 #
 # Feel free to use this code in your own projects, including commercial projects
 # License: Apache v2.0 <http://www.apache.org/licenses/LICENSE-2.0.html>
-
+# ------------------------------------------------------------------------------
 
 
 # Takes the gridlayout with the current obstacle positioning together with the start and goal position.
-# Calculates the best path to the goal and returns the first action that needs to be taken to reach the goal.
+# Calculates the best path to the goal and returns the first action that needs to be taken to reach the goal
+# as well as what position and direction the robot will end up in after that action.
 # grid: Grid object
 #       Example:
 #         grid = Grid(numberOfxDimensions, numberOfyDimensions)
@@ -21,29 +23,86 @@
 #         (x, y, 0, 1) down
 #         (x, y, 0, -1) up
 #
-# goal: tuple, (xPosition, yPosition, 0, 0)
+# goal: tuple, (xPosition, yPosition)
 #
-# Output: string, "goal", "forward", "backward", "right", "left" or False if no path to the goal was found
-def robotNextAction(grid, start, goal):
-  came_from, cost_so_far = a_star_search(grid, start, goal)
-  pathList = actionList(came_from, start, goal)
-  return firstAction(pathList)
+# dropOff: boolean, True if robot holds a package and is going for a drop-off, False if robot is moving to pickup a package
+#
+# draw: boolean, True to display a printed representation of the grid. Default value set to False
+#
+# Output: tuple (string, tuple),
+#         string: "pickup", "dropoff", "forward", "backward", "right", "left" or "wait" if no path to the goal was found
+#         tuple: (xPosition, yPosition, cardinal direction)
+#           Example:
+#             ("right", (1, 1, "south"))
+def robotNextActionAndPosition(grid, start, goal, dropOff, draw = False):
+  if(goal == False):
+    nextAction = 'wait'
+    return (nextAction, start)
+
+  goal = (goal[0], goal[1], 0, 0)
+  came_from, cost_so_far = a_star_search(grid, start, goal, dropOff)
+  pathList = actionList(came_from, start, goal, dropOff)
+
+  if(draw):
+    draw_grid(grid, pathList, start, goal, 4)
+
+  nextAction = firstAction(pathList)
+  if(nextAction == 'goal' and dropOff):
+    nextAction = 'dropoff'
+  elif(nextAction == 'goal' and not dropOff):
+    nextAction = 'pickup'
+
+  if(nextAction == False):
+    nextAction = 'wait'
+    return (nextAction, start)
+
+  nextPos = nextPositon(pathList)
+  return (nextAction, nextPos)
+
+
+# Takes the gridlayout with the current obstacle positioning together with the start and goal position.
+# Calculates if a path to the goal can be found and returns if there is a path of not.
+# Input:
+# grid: Grid object
+#       Example:
+#         grid = Grid(numberOfxDimensions, numberOfyDimensions)
+#         grid.obstacles = [(1, 3), (2, 3)]
+#
+# start: tuple, (xPosition, yPosition, xDirection, yDirection)
+#       Example:
+#         x = 1, y = 1
+#         (x, y, 1, 0) means facing right
+#         (x, y, -1, 0) left
+#         (x, y, 0, 1) down
+#         (x, y, 0, -1) up
+#
+# goal: tuple, (xPosition, yPosition)
+#
+# dropOff: boolean, True if robot holds a package and is going for a drop-off, False if robot is moving to pickup a package
+#
+# Output: boolean, True if a path to the goal is possible, False if not
+def existingPath(grid, start, goal, dropOff):
+  goal = (goal[0], goal[1], 0, 0)
+  came_from, cost_so_far = a_star_search(grid, start, goal, dropOff)
+  pathList = actionList(came_from, start, goal, dropOff)
+  return pathList != []
 
 # ------------ HELPER FUNCTIONS BELOW ----------------------
-
 
 def draw_tile(graph, x, y, path, width, start, goal):
   r = ""
   if(start[0] == x and start[1] == y):
     r = "A"
-  for step in path:
-    step = step[0]
 
-    if(step[0] == x and step[1] == y):
-      if step[2] == 1: r = r + ">"
-      if step[2] == -1: r = r + "<"
-      if step[3] == 1: r = r + "v"
-      if step[3] == -1: r = r + "^"
+  if(path != True):
+    for step in path:
+      step = step[0]
+
+      if(step[0] == x and step[1] == y):
+        if step[2] == 1: r = r + ">"
+        if step[2] == -1: r = r + "<"
+        if step[3] == 1: r = r + "v"
+        if step[3] == -1: r = r + "^"
 
   if(goal[0] == x and goal[1] == y):
     r = r + "Z"
@@ -58,7 +117,9 @@ def draw_grid(graph, path, start, goal, width=2):
   for y in range(graph.height):
     for x in range(graph.width):
       print("%%-%ds" % width % draw_tile(graph, x, y, path, width, start, goal), end="")
+
     print()
+  print('-----')
 
 class SquareGrid:
   def __init__(self, width, height):
@@ -161,11 +222,9 @@ class PriorityQueue:
 
 
 def heuristic(a, b):
-  (x1, y1, x1dir, y1dir) = a
-  (x2, y2, x2dir, y2dir) = b
-  return abs(x1 - x2) + abs(y1 - y2)
+  return abs(a[0] - b[0]) + abs(a[1] - a[1])
 
-def a_star_search(graph, start, goal):
+def a_star_search(graph, start, goal, dropOff):
   frontier = PriorityQueue()
   frontier.put(start, 0)
   came_from = {}
@@ -176,12 +235,20 @@ def a_star_search(graph, start, goal):
   while not frontier.empty():
     current = frontier.get()
 
-    if(type(current[0]) is tuple):
-      if current[0][0]+current[0][2] == goal[0] and current[0][1]+current[0][3] == goal[1]:
-        break
+    if(dropOff):
+      if(type(current[0]) is tuple):
+        if current[0][0]+current[0][2] == goal[0] and current[0][1]+current[0][3] == goal[1]:
+          break
+      else:
+        if(current[0]+current[2] == goal[0] and current[1]+current[3] == goal[1]):
+          break
     else:
-      if(current[0]+current[2] == goal[0] and current[1]+current[3] == goal[1]):
-        break
+      if(type(current[0]) is tuple):
+        if current[0][0] == goal[0] and current[0][1] == goal[1]:
+          break
+      else:
+        if(current[0] == goal[0] and current[1] == goal[1]):
+          break
 
     for next in graph.options(current):
       new_cost = cost_so_far[current] + next[1]
@@ -193,19 +260,27 @@ def a_star_search(graph, start, goal):
 
   return came_from, cost_so_far
 
-def findGoalAction(came_from, x, y):
+def findGoalAction(came_from, x, y, dropOff):
   for pos in came_from:
-    if(type(pos[0]) is tuple):
-      if((pos[0][0] + pos[0][2], pos[0][1] + pos[0][3]) == (x, y)):
-        return pos[0]
+    if(dropOff):
+      if(type(pos[0]) is tuple):
+        if((pos[0][0] + pos[0][2], pos[0][1] + pos[0][3]) == (x, y)):
+          return pos[0]
+      else:
+        if((pos[0] + pos[2], pos[1] + pos[3]) == (x, y)):
+          return pos
     else:
-      if((pos[0] + pos[2], pos[1] + pos[3]) == (x, y)):
-        return pos
+      if(type(pos[0]) is tuple):
+        if((pos[0][0], pos[0][1]) == (x, y)):
+          return pos[0]
+      else:
+        if((pos[0], pos[1]) == (x, y)):
+          return pos
 
   return False
 
-def actionList(came_from, start, goal):
-  goalAction = findGoalAction(came_from, goal[0], goal[1])
+def actionList(came_from, start, goal, dropOff):
+  goalAction = findGoalAction(came_from, goal[0], goal[1], dropOff)
   if(goalAction == False):
     return list()
   elif(len(came_from) == 1):
@@ -214,13 +289,35 @@ def actionList(came_from, start, goal):
   actions = list([(goalAction, 2)])
   keys = list(came_from.keys())
 
-  current = came_from[(goalAction, 2)]
+  if((goalAction, 2) in came_from):
+    current = came_from[(goalAction, 2)]
+  elif((goalAction, 3) in came_from):
+    current = came_from[(goalAction, 3)]
+  else:
+    current = came_from[goalAction]
+
   while(current != start):
     actions.insert(0, current)
     current = came_from[current]
 
   actions.insert(0, (start, 2))
   return actions
+
+def nextPositon(actionsList):
+  if(actionsList == 'goal' or len(actionsList) == 1):
+    return 'goal'
+  (xNext, yNext, xDirNext, yDirNext) = actionsList[1][0]
+
+  if(xDirNext == 1):
+    return(xNext, yNext, 'east')
+  elif(xDirNext == -1):
+    return(xNext, yNext, 'west')
+  elif(yDirNext == 1):
+    return(xNext, yNext, 'south')
+  elif(yDirNext == -1):
+    return(xNext, yNext, 'north')
+
+  return False
 
 def firstAction(actionsList):
   goal = "goal"
@@ -229,7 +326,7 @@ def firstAction(actionsList):
   right = "right"
   left = "left"
 
-  if(actionsList == "goal"):
+  if(actionsList == 'goal' or len(actionsList) == 1):
     return goal
   elif(actionsList == []):
     return False
