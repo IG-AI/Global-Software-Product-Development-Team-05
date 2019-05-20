@@ -1,7 +1,7 @@
 from queue import Queue
 from time import sleep
 import socket, pickle, _thread
-import util.pathfinding
+import util.aiPlacement as ai
 
 class Server:
     """
@@ -47,7 +47,7 @@ class Server:
             List with the connected clients IP addresses.
         robots : list of strings
             List with the connected robots IP addresses.
-        commands_queues_list : list
+        commands_list : list
             A list with the unique Queues for specific robots with manual commands to the robots.
         videostream : Video Stream
             The video stream from the camera.
@@ -62,11 +62,12 @@ class Server:
 
         self.clients = []
         self.robots = []
-        self.commands_queues_list = []
+        self.commands_list = []
         self.robots_manual_mode = []
         self.robots_started = []
         self.videostream = None
         self.map = None
+        self.current_layout = None
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.bind((self.HOST, self.PORT))
         self.sock.listen()
@@ -187,19 +188,20 @@ class Server:
         """
         if time == None:
             if robot in self.robots:
-                print("Starting up robot at: " + str(robot))
-                self.robots_started.append(robot)
+                print("Starting up robot at: " + str(robot[0]))
+                self.robots_started.append(robot[0])
             else:
-                print("Robot: " + str(robot) + " isn't connected to the server!")
+                print(self.robots)
+                print("Robot: " + str(robot[0]) + " isn't connected to the server!")
 
         elif type(time) == int:
             if robot in self.robots:
-                print("Starting up robot at: " + str(robot))
-                self.robots_started.append(robot)
+                print("Starting up robot at: " + str(robot[0]))
+                self.robots_started.append(robot[0])
                 sleep(time)
                 self.stop_robot(robot)
             else:
-                print("Robot: " + str(robot) + " isn't connected to the server!")
+                print("Robot: " + str(robot[0]) + " isn't connected to the server!")
         else:
             raise Exception("Invalid input! Input has to be an int.")
 
@@ -213,10 +215,10 @@ class Server:
             A tuple with the IP address and port to the robot that should be started.
         """
         if robot in self.robots_started:
-            print("Turning off the robot  at: "+ str(robot))
+            print("Turning off the robot  at: "+ str(robot[0]))
             self.robots_started.remove(robot)
         else:
-            print("The robot: " + robot + " hasn't been started!")
+            print("The robot: " + str(robot[0]) + " hasn't been started!")
 
     def disconnect(self):
         """
@@ -236,8 +238,8 @@ class Server:
         address: string
             The address of the robot you want the commands queue for.
         """
-        for i in range(len(self.commands_queues_list)):
-            if self.commands_queues_list[i][0] == address:
+        for i in range(len(self.commands_list)):
+            if self.commands_list[i][0] == address:
                 index = i
 
         return index
@@ -251,15 +253,15 @@ class Server:
         address: string
             The address of the robot you want.
         """
-        for i in range(len(self.commands_queues_list)):
+        for i in range(len(self.commands_list)):
             if self.robots[i][0] == robot:
                 index = i
 
         return index
 
     def _createCommand(self, robot): # - TODO: Create AI
-        self.commands_queues_list[len(self.commands_queues_list)][0] = robot
-        self.commands_queues_list[len(self.commands_queues_list)][0] = (2,2) #This should be calculated.
+        self.commands_list[len(self.commands_list) - 1][0] = robot
+        self.commands_list[len(self.commands_list) - 1][1] = (5, 4) #This should be calculated.
 
     def _listen_robot(self, robotsocket, address):
         """
@@ -274,11 +276,14 @@ class Server:
             A tuple with the IP address of the robot in the form of a string and a port number to the robot in the form
             of a int.
         """
-        newQueue = (address, Queue())
-        self.commands_queues_list.append(newQueue)
-        self.robots.append([address, (1,1)])
+        newQueue = [address, Queue()]
+        self.commands_list.append(newQueue)
+        self.robots.append([address, (0,0), "north"])
         sentStartFlag = False
         sentStopFlag = None
+        new_grid_layout = ai.init_grid_layout(self.map.height, self.map.width)
+        new_grid_layout = ai.init_robot_start_position(new_grid_layout, len(self.robots), (0,0, "north"), self.map.width)
+        number_of_runs = 0
         while self.RUN:
             sleep(1)
             try:
@@ -310,19 +315,33 @@ class Server:
 
             index = self._find_commands_queue(address)
 
-            if self.commands_queues_list[index].empty():
+            print("Test: " + str(self.commands_list))
+            if self.commands_list[index][1].empty():
                 self._createCommand(address)
 
-            command = self.commands_queues_list[index][1].get()
-            direction = util.pathfinding(command)
+            if (number_of_runs % 2) == 0:
+                pickup_flag = True
+            else:
+                pickup_flag = False
+
+            command = self.commands_list[index].pop(1)
+            print(new_grid_layout)
+            direction, robotNextPosition, new_grid_layout, goalPosition = ai.next_action_and_position_and_grid_update(self.map.width, self.map.height, new_grid_layout, command, pickup_flag, len(self.robots))
+            X, Y, direction = robotNextPosition
+            self.current_layout = new_grid_layout
+            self.robots[self._find_robot(address)][1] = (X, Y)
+            self.robots[self._find_robot(address)][2] = direction
             while direction != "goal":
                     robotsocket.sendall(pickle.dumps(direction))
                     print("Successfully sent a direction (" + str(direction) + ") to a robot at: " + str(address))
-                    command = self.commands_queues_list[index][1].get()
-                    direction = util.pathfinding(command)
+                    direction, robotNextPosition, new_grid_layout, goalPosition = ai.next_action_and_position_and_grid_update(self.map.width, self.map.height, self.current_layout, command, pickup_flag, len(self.robots))
+                    X, Y, direction = robotNextPosition
+                    self.current_layout = new_grid_layout
+                    self.robots[self._find_robot(address)][1] = (X, Y)
+                    self.robots[self._find_robot(address)][2] = direction
 
         index = self._find_commands_queue(address)
-        self.commands_queues_list.pop(index)
+        self.commands_list.pop(index)
         try:
             self.robots.remove(address)
         except:
@@ -406,9 +425,9 @@ class Server:
                     self.robots_manual_mode.remove(device)
 
             else:
-                for i in range(len(self.commands_queues_list)):
-                    if self.commands_queues_list[i].put(device):
-                        self.commands_queues_list[i].put(command)
+                for i in range(len(self.commands_list)):
+                    if self.commands_list[i].put(device):
+                        self.commands_list[i].put(command)
                         print("Received " + str(command) + " to robot at " + str(device) + " from a client at: " + str(address))
 
         try:
@@ -441,19 +460,4 @@ class Server:
 
         print("Disconnecting the camera...")
         camerasocket.sendall(pickle.dumps("end"))
-            
-if __name__ == "__main__":
-    server = Server()
-    server.connect()
-    startFlag = False
-    startFlag2 = False
-    while True:
-        sleep(1)
-        if (len(server.robots) > 0) & (startFlag == False):
-            server.start_robot(server.robots[0], 120)
-            startFlag = True
-
-        elif (len(server.robots) > 1) & (startFlag2 == False):
-            server.start_robot(server.robots[1], 120)
-            startFlag2 = True
 

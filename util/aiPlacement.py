@@ -1,4 +1,4 @@
-import pathfinding as pf
+import util.pathfinding as pf
 
 # Global variables
 robot_identifier = 'robot'
@@ -136,3 +136,16 @@ def updated_grid_layout(old_grid_layout, gridWidth, currentRobotPosition, nextRo
     new_grid_layout[newX + newY * gridWidth] = robot_identifier + str(robot_nr) + newDirection
 
   return new_grid_layout
+
+def init_grid_layout(grid_width, grid_height):
+  return ['empty'] * grid_width * grid_height
+
+def init_robot_start_position(grid_layout, robot_nr, robot_pos, grid_width):
+  updated_grid_layout = grid_layout
+
+  x = robot_pos[0]
+  y = robot_pos[1]
+  direction = robot_pos[2]
+  updated_grid_layout[x + y * grid_width] = 'robot' + str(robot_nr) + direction
+
+  return updated_grid_layout

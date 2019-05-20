@@ -1,4 +1,4 @@
-import pathfinding as pf
+import util.pathfinding as pf
 
 if __name__ == '__main__':
   start, goal = (0, 0, 0, 1), (5, 4)

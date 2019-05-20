@@ -1,11 +1,6 @@
-import socket, pickle, _thread, serial
+import socket, pickle, _thread
 from queue import Queue
 from time import sleep
-
-from ev3dev2.motor import LargeMotor, MoveSteering, OUTPUT_A, OUTPUT_B, OUTPUT_C, SpeedPercent
-from ev3dev2.sensor import INPUT_1
-from ev3dev2.sensor.lego import ColorSensor
-from ev3dev2.sound import Sound
 
 PORT_A = 0x00
 PORT_B = 0x01
@@ -37,7 +32,9 @@ class Robot():
     disconnect(self)
         Disconnects the robot to the server.
     """
-    def __init__(self, current_location_x=0, current_location_y=0, current_direction="north", host='127.0.1.1', port=2526, pos=(1, 1)):
+    __tablename__ = 'robot'
+
+    def __init__(self, current_location_x=0, current_location_y=0, current_direction="north", host='127.0.1.1', port=2526):
         """
         Initialize the robot class, with a host and port as optional input.
 
@@ -77,22 +74,11 @@ class Robot():
         self.SERVER_PORT = port
         self.MANUAL = False
         self.RUN = False
-        self.PICKUP = True
-        self.wheels_motor = MoveSteering(OUTPUT_A, OUTPUT_B)
-        self.arm_motor = LargeMotor(OUTPUT_C)
-        self.color_sensor = ColorSensor(INPUT_1)
-        self.speaker = Sound()
         self.current_location_x = current_location_x
         self.current_location_y = current_location_y
         self.assign_coordinate(current_location_x, current_location_y, current_direction)
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.direction_queue = Queue()
-
-    def __del__(self):
-        """
-        Disconnects the robot if the robot object is removed.
-        """
-        self.sock.close()
 
     def connect(self):
         """
@@ -181,7 +167,6 @@ class Robot():
         """
         Aux function to the start function.
         """
-        self.speaker.speak("Go Go Gadget!")
         self.RUN = True
         while self.RUN:
             self.recv(1)
@@ -193,123 +178,7 @@ class Robot():
         """
         Function that stops the robot.
         """
-        self.speaker.speak("Bye Bye Bitchers!")
         self.RUN = False
-
-    def turn_cardinal(self, direction):
-        """
-        Turns the robot 90 degrees, either to left or right based on the input.
-
-        Parameters
-        ----------
-        direction: string
-            The cardinal direction the robot should face.
-
-        Raises
-        ------
-            Exception:
-                If the input isn't either east, west, north or south, Exception is raised.
-        """
-        if (direction == "west") | (direction == "east") | (direction == "north") | (direction == "south"):
-            if self.current_direction != direction:
-                if self.current_direction == "west":
-                    if direction == "east":
-                        self.wheels_motor.on_for_rotations(100, SpeedPercent(25), 180)
-                    elif direction == "north":
-                        self.wheels_motor.on_for_rotations(100, SpeedPercent(25), 90)
-                    elif direction == "south":
-                        self.wheels_motor.on_for_rotations(-100, SpeedPercent(25), 90)
-
-                elif self.current_direction == "east":
-                    if direction == "west":
-                        self.wheels_motor.on_for_rotations(-100, SpeedPercent(25), 180)
-                    elif direction == "north":
-                        self.wheels_motor.on_for_rotations(-100, SpeedPercent(25), 90)
-                    elif direction == "south":
-                        self.wheels_motor.on_for_rotations(100, SpeedPercent(25), 90)
-
-                elif self.current_direction == "north":
-                    if direction == "west":
-                        self.wheels_motor.on_for_rotations(-100, SpeedPercent(25), 90)
-                    elif direction == "east":
-                        self.wheels_motor.on_for_rotations(100, SpeedPercent(25), 90)
-                    elif direction == "south":
-                        self.wheels_motor.on_for_rotations(100, SpeedPercent(25), 180)
-
-                elif self.current_direction == "south":
-                        if direction == "west":
-                            self.wheels_motor.on_for_rotations(-100, SpeedPercent(25), 90)
-                        elif direction == "east":
-                            self.wheels_motor.on_for_rotations(100, SpeedPercent(25), 90)
-                        elif direction == "north":
-                            self.wheels_motor.on_for_rotations(100, SpeedPercent(25), 180)
-
-                self.current_direction = direction
-            else:
-                pass
-        else:
-            raise Exception("The direction has to be a string with either west, east, north and south!")
-
-    def run(self, speed=50):
-        """
-        Starts the motors, with the speed as the input, as the default 64
-
-        Parameters
-        ----------
-        speed (=64): int
-            The speed the robot should run in.
-
-        Raises
-        ------
-        Exception:
-            If the input isn't an int, Exception is raised.
-        """
-        if type(speed) is int:
-                self.wheels_motor.on(SpeedPercent(speed))
-                while self.color_sensor.color() != 'Red':
-                    pass
-                self.brake()
-
-        else:
-            raise Exception("The speed has to be an int!")
-
-    def back(self, speed=50):
-        """
-        Starts the motors in reverse, with the speed as the input, as the default 64
-
-        Parameters
-        ----------
-        speed (=64): int
-            The speed the robot should run in.
-
-        Raises
-        ------
-        Exception:
-            If the input isn't an int, Exception is raised.
-        """
-        if type(speed) is int:
-                self.wheels_motor.on(-SpeedPercent(speed))
-                while self.color_sensor.color() != 'Red':
-                    pass
-                self.brake()
-
-        else:
-            raise Exception("The speed has to be an int!")
-
-    def brake(self):
-        """
-        Breaks the robots movement.
-        """
-        self.wheels_motor.stop()
-
-    def lift_arm(self):
-        """
-        Lifts the robots arm
-        """
-        self.arm_motor.on_for_seconds(SpeedPercent(20), 3)
-
-    def lower_arm(self):
-        self.arm_motor.on_for_seconds(-SpeedPercent(20), 3)
 
     def disconnect(self):
         """
@@ -320,7 +189,7 @@ class Robot():
         sleep(1)
         self.sock.close()
 
-    def move(self):
+    def move(self, tempeture_check = False):
         """
         Moves the robot sequentially, one cell at the time until i
 
@@ -343,17 +212,15 @@ class Robot():
 
         if direction == "goal":
             print("Robot reached it destination!")
-            if self.PICKUP:
-                self.lift_arm()
-            else:
-                self.lower_arm()
             return "done"
 
         elif direction == "forward":
-            self.run()
+            print("Robot moving to new cell!")
+            self._update_current_position(self.current_direction)
 
         elif direction == "backward":
-            self.back()
+            print("The robot has backed!")
+            self._update_current_position(self.current_direction, False)
 
         elif direction == "right":
             if self.current_direction == "north":
@@ -364,7 +231,7 @@ class Robot():
                 self.current_direction = "north"
             elif self.current_direction == "east":
                 self.current_direction = "south"
-            self.wheels_motor.on_for_rotations(100, SpeedPercent(25), 90)
+            print("The robot has moved right!")
 
         elif direction == "left":
             if self.current_direction == "north":
@@ -375,7 +242,7 @@ class Robot():
                 self.current_direction = "south"
             elif self.current_direction == "east":
                 self.current_direction = "north"
-            self.wheels_motor.on_for_rotations(-100, SpeedPercent(25), 90)
+            print("The robot has moved left!")
 
         elif direction == False:
             print("No no path to the goal could be calculated!")
@@ -383,59 +250,13 @@ class Robot():
         else:
             raise Exception("The direction in move() has to be either, goal, forward, backward, right or left!")
 
+        if tempeture_check == True:
+            tempeture = self.temperature_sensor.get_temperature()
+            if tempeture > 30:
+                print(
+                    "The temperature at the robots location is dangerously high (" + tempeture + " '\u2103')")
+
         self.sock.sendall(pickle.dumps(["pos", (self.current_location_x, self.current_location_y)]))
-
-    def move_to_coords(self, coordinate):
-        """
-        Moves the robot to the first coordinate in the direction_queue, if it's empty and manual mode isn't activated
-        then it automatic creates a new command.
-
-        Parameters
-        ----------
-        coordinate(=None): Tuple
-            Coordinate to which the robot should move_to_coords, if left empty the robots moves to the first coordinate in the
-            coordinate queue. It the queue is empty, the robot will automatic create a new coordinate.
-
-        tempeture_check(=True): boolean
-            A flag that indicates if the robot should preform a temperature check, by default true.
-
-        Raises
-        ------
-        Exception:
-            If the command isn't in the format (x, y), Exception is raised.
-
-        Exception:
-            If the input isn't in the format (x, y) or None, Exception is raised.
-
-        """
-        try:
-            X, Y = coordinate
-        except :
-            raise Exception("Wrong format of the input coordinates!")
-
-        print("The robot has started to move_to_coords to: (" + X + ", " + Y + ")")
-
-        if self.current_location_x < X:
-            self.turn_cardinal("east")
-        else:
-            self.turn_cardinal("west")
-
-        self.run()
-        while (self.current_location_x != X):
-            self.run()
-            self._update_current_position(self.current_direction)
-
-        if self.current_location_y < Y:
-            self.turn_cardinal("south")
-        else:
-            self.turn_cardinal("north")
-
-        self.run()
-        while self.current_location_y != Y:
-            self.run()
-            self._update_current_position(self.current_direction)
-
-        print("Robot has reaches it's destination at: (" + X + ", " + Y + ")")
 
     @property
     def serialize(self):
@@ -478,3 +299,9 @@ class Robot():
                 {}
             else:
                 return 1
+
+
+    @classmethod
+    def find_by_id(cls, id):
+        packet = cls.query.filter_by(id = id).first()
+        return packet
