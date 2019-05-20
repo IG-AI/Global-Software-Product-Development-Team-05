@@ -7,11 +7,6 @@ from ev3dev2.sensor import INPUT_1
 from ev3dev2.sensor.lego import ColorSensor
 from ev3dev2.sound import Sound
 
-PORT_A = 0x00
-PORT_B = 0x01
-PORT_C = 0x02
-PORT_D = 0x03
-
 class Robot():
     """
     A class which handles a LEGO robot. It can connect to a server and receive commands form the server.
@@ -37,7 +32,7 @@ class Robot():
     disconnect(self)
         Disconnects the robot to the server.
     """
-    def __init__(self, current_location_x=0, current_location_y=0, current_direction="north", host='127.0.1.1', port=2526, pos=(1, 1)):
+    def __init__(self, current_location_x=0, current_location_y=0, current_direction="north", host='127.0.1.1', port=2526):
         """
         Initialize the robot class, with a host and port as optional input.
 
