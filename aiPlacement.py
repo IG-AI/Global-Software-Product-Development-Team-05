@@ -32,7 +32,7 @@ package_identifier = 'package'
 #   robot_nr: int, id of the robot that wants to be moved. Default set to 1
 #
 # Return:
-#   nextAction: string, "goal", "forward", "backward", "right", "left" or "wait" if no path to the goal was found
+#   nextAction: string, "pickup", "dropoff", "forward", "backward", "right", "left" or "wait" if no path to the goal was found
 #   robotNextPosition: tuple, (xPosition, yPosition, cardinal direction)
 #                      cardinal directions: "north", "east", "south", "west"
 #                         Example:

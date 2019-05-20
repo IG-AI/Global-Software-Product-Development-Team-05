@@ -284,9 +284,9 @@ def actionList(came_from, start, goal, dropOff):
   if(goalAction == False):
     return list()
   elif(len(came_from) == 1):
-    return 'goal'
+    return [(list(came_from.keys())[0], 2)]
 
-  actions = list([(goalAction, 2)])
+  actions = [(goalAction, 2)]
   keys = list(came_from.keys())
 
   if((goalAction, 2) in came_from):
@@ -304,9 +304,10 @@ def actionList(came_from, start, goal, dropOff):
   return actions
 
 def nextPositon(actionsList):
-  if(actionsList == 'goal' or len(actionsList) == 1):
-    return 'goal'
-  (xNext, yNext, xDirNext, yDirNext) = actionsList[1][0]
+  if(len(actionsList) == 1):
+    (xNext, yNext, xDirNext, yDirNext) = actionsList[0][0]
+  else:
+    (xNext, yNext, xDirNext, yDirNext) = actionsList[1][0]
 
   if(xDirNext == 1):
     return(xNext, yNext, 'east')
@@ -326,7 +327,7 @@ def firstAction(actionsList):
   right = "right"
   left = "left"
 
-  if(actionsList == 'goal' or len(actionsList) == 1):
+  if(len(actionsList) == 1):
     return goal
   elif(actionsList == []):
     return False

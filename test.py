@@ -72,8 +72,8 @@ if __name__ == '__main__':
           robots_drop_off_states[robot_to_move] = True
         else:
           robots_goal_positions[robot_to_move] = goalPosition
-        robots_ready[robot_to_move] = False
+        # robots_ready[robot_to_move] = False
 
 
 
-    time.sleep(0.02)
+    time.sleep(0.1)
