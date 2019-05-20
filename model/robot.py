@@ -32,10 +32,12 @@ class Robot(Base):
             'current_direction': self.current_direction
         }
 
-    def assign_coordinate(self, current_location_x, current_location_y, current_direction):
+    def assign_coordinate(self, current_location_x, current_location_y, current_direction, current_goal_x, current_goal_y):
         self.current_location_x = current_location_x
         self.current_location_y = current_location_y
         self.current_direction = current_direction
+        self.current_goal_x = current_goal_x
+        self.current_goal_y = current_goal_y
 
     def assign_direction(self, current_direction):
         self.current_direction = current_direction

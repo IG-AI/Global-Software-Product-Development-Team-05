@@ -77,6 +77,7 @@ def pre_authorized(f):
         robot_accounts = Account.query.all()
         try:
             token = request.headers.get('Authorization')
+            print(token)
             payload = jwt.decode(token[7:])
 
             if payload is None:

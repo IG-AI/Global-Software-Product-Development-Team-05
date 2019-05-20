@@ -105,14 +105,16 @@ def command_auto():
         return json.dumps({'message': 'Cannot connect to robot'}), 400
     return "Successful"
 
-@robots.route("/api/direction", methods = ['PUT'])
+@robots.route("/api/direction", methods = ['POST'])
 @pre_authorized
 def command_direct():
     request_data = request.get_data()
+    print(request_data)
     try:
         token = request.headers.get('Authorization')
         payload = jwt.decode(token[7:])
         robot_id = payload.get('sub')
+        print(robot_id)
         if (robot_id == None):
             raise Exception
 
@@ -121,7 +123,9 @@ def command_direct():
             return jsonify({'message': 'Robot not found'}), 404
 
         data = json.loads(request_data)
+        print(data)
         command = data['command']
+        print(command)
 
         if (command == None):
             raise Exception
@@ -129,10 +133,11 @@ def command_direct():
         #Control robot go to direction relative to facing of robot
         #Server calculate new facing direction of robot relative to coordinate and save to database
         
-        if (command not in ["north", "east", "south", "west", "drop"]):
+        if (command not in ["north", "east", "south", "west", "pack"]):
+            print(command)
             return jsonify({'message': 'Not expected command'}), 404
         current_direction = robot.current_direction
-        if (command == "drop"):
+        if (command == "pack"):
             new_direction = "center"
         else: 
             new_direction = changing_direction(current_direction, command)
@@ -140,6 +145,7 @@ def command_direct():
        
         if (robot.role == True):
             address = Address.find_by_id(robot_id)
+            print(address)
             if not address:
                 return jsonify({'message': 'Robot did not register host'}), 404 
             send(address.host, PORT, message)
@@ -214,9 +220,18 @@ def create_robot():
         current_direction = data['direction']
         current_goal_x = data['goal_x']
         current_goal_y = data['goal_y']
+        print("got")
 
-        robot = Robot(account_id, account.role, current_location_x, current_location_y, current_direction, current_goal_x, current_goal_y)
-        robot.save_to_db()
+        robot = Robot.find_by_id(account_id)
+        if not robot:
+            robot = Robot(account_id, account.role, current_location_x, current_location_y, current_direction, current_goal_x, current_goal_y)
+            robot.save_to_db()
+        else:
+            robot.assign_coordinate(current_location_x, current_location_y, current_direction, current_goal_x, current_goal_y)
+            robot.save_to_db()
+        print("r")
+        print (robot.serialize)
+        #robot.save_to_db()
         #Update map
     except Exception:
         return jsonify({'message': 'Invalid data'}),404

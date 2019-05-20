@@ -9,6 +9,7 @@ from controller.lego_controller import legos
 from authentication.login import login
 
 app = Flask(__name__)
+CORS(app)
 app.config.from_object('config.Config')
 
 app.register_blueprint(robots)
@@ -16,8 +17,8 @@ app.register_blueprint(accounts)
 app.register_blueprint(login)
 app.register_blueprint(legos)
 
-cors = CORS(send_wildcard=True)
-cors.init_app(app)
+#cors = CORS(send_wildcard=True)
+#cors.init_app(app)
 
 if __name__ == '__main__':
     #global map

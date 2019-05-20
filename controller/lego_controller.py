@@ -93,7 +93,11 @@ def log():
         #coordinate_y = robot.coordinate_y
         #facing = robot.
         print("start")
-        if detect_moveable(robot.current_location_x, robot.current_location_y, absolute_direction):
+        if absolute_direction == "pack":
+            send (addr, PORT, bytes(absolute_direction, 'utf-8'))
+            map_send = 'map:' + map
+            send(addr, PORT, bytes(map_send, 'utf-8'))
+        elif detect_moveable(robot.current_location_x, robot.current_location_y, absolute_direction):
             send (addr, PORT, bytes('halt', 'utf-8'))
             map_send = 'map:' + map
             send(addr, PORT, bytes(map_send, 'utf-8'))
