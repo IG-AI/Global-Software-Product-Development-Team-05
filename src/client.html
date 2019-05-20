@@ -1,0 +1,39 @@
+<html>
+
+<head>
+    <title>Video Streaming Demonstration</title>
+    <link rel="stylesheet" type="text/css" href="./style.css">
+</head>
+
+<body>
+    <div>
+        <div style="display:flex">
+            <p class="title-camera"> IP CAMERA: </p>
+            <input class="tags-input" id="ip_input" type="text" name="fname" placeholder="192.168.0.1:8080"
+                value="">
+        </div>
+        <br>
+        <button class="button-get-video" onclick="onClickGetVideo()">Connect Video</button>
+        <button class="button-stop-video" onclick="onClickStopVideo()">Stop</button>
+        <br><br>
+        <img heigh="400px" background="white" id="bg" src="novideo.jpg"></img>
+    </div>
+
+    <script>
+
+        // The address of server, example locahost:port if run server on localhost
+        var domain = "localhost:5000"
+        function onClickGetVideo() {
+            var ip = document.getElementById("ip_input").value
+            document.getElementById("bg").src = "http://" + domain + "/video_feed?id=" + ip;
+        }
+
+        function onClickStopVideo() {
+            document.getElementById("bg").src = "novideo.jpg";
+        }
+
+    </script>
+
+</body>
+
+</html>
