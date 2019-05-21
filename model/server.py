@@ -283,7 +283,6 @@ class Server:
         sentStopFlag = None
         new_grid_layout = ai.init_grid_layout(self.map.height, self.map.width)
         new_grid_layout = ai.init_robot_start_position(new_grid_layout, len(self.robots), (0,0, "north"), self.map.width)
-        number_of_runs = 0
         while self.RUN:
             sleep(1)
             try:
@@ -319,11 +318,6 @@ class Server:
             if self.commands_list[index][1].empty():
                 self._createCommand(address)
 
-            if (number_of_runs % 2) == 0:
-                pickup_flag = True
-            else:
-                pickup_flag = False
-
             command = self.commands_list[index].pop(1)
             print(new_grid_layout)
             direction, robotNextPosition, new_grid_layout, goalPosition = ai.next_action_and_position_and_grid_update(self.map.width, self.map.height, new_grid_layout, command, pickup_flag, len(self.robots))
@@ -334,7 +328,7 @@ class Server:
             while direction != "goal":
                     robotsocket.sendall(pickle.dumps(direction))
                     print("Successfully sent a direction (" + str(direction) + ") to a robot at: " + str(address))
-                    direction, robotNextPosition, new_grid_layout, goalPosition = ai.next_action_and_position_and_grid_update(self.map.width, self.map.height, self.current_layout, command, pickup_flag, len(self.robots))
+                    direction, robotNextPosition, new_grid_layout, goalPosition = ai.next_action_and_position_and_grid_update(self.map.width, self.map.height, self.current_layout, command[1], command[0], len(self.robots))
                     X, Y, direction = robotNextPosition
                     self.current_layout = new_grid_layout
                     self.robots[self._find_robot(address)][1] = (X, Y)

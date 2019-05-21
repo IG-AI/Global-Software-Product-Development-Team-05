@@ -47,7 +47,7 @@ class Client:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.settimeout(10)
         self.map = None
-        self.coordinates_queue = Queue()
+        self.commands_queue = Queue()
 
     def __del__(self):
         """
@@ -74,7 +74,7 @@ class Client:
             raise Exception("The client couldn't connect to the server!")
 
 
-    def send_command(self, command, robot=None):
+    def send_command(self, pickup, command, robot=None):
         """
         Sending a new command for the robot(s) through the server.
 
@@ -103,8 +103,8 @@ class Client:
                 else:
                     print("Trying to send a new command (" + str(command) + ") to a robot at: " + str(robot))
                 try:
-                    self._set_command(command)
-                    self.sock.sendall(pickle.dumps((robot, self.coordinates_queue.get())))
+                    self._set_command(pickup, command)
+                    self.sock.sendall(pickle.dumps((robot, self.commands_queue.get())))
                 except:
                     print("Couldn't send to server, the server is probably disconnected.")
                     self.disconnect()
@@ -182,7 +182,7 @@ class Client:
         self.sock.sendall(pickle.dumps((self.sock.getsockname(), "end")))
         self.sock.close()
 
-    def _set_command(self, command):
+    def _set_command(self, pickup, command):
         """
         Setting a new command for the robot(s) in the direction_queue.
 
@@ -191,7 +191,7 @@ class Client:
         command: string
             The new command for the robot(s).
         """
-        self.coordinates_queue.put(command)
+        self.commands_queue.put([pickup, command])
 
     def _update_robots_list(self):
         """
