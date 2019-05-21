@@ -2,10 +2,10 @@ from queue import Queue
 from time import sleep
 import socket, pickle, random
 
+
 class Client:
     """
     A class which handles a client. It can connect to a server and transmits commands for the robot(s) to the server.
-
     Methods
     -------
     connect(self):
@@ -19,17 +19,16 @@ class Client:
     disconnect(self):
         Disconnects the client to the server.
     """
+
     def __init__(self, host='127.0.1.1', port=2526):
         """
         Initialize the client class, with a host and port as optional input.
-
         Parameters
         ----------
         host(='127.0.1.1'): string
             A string with the IP address to the server.
         port(=2526): int
             A port number to the server.
-
         Attributes
         ----------
         SERVER_HOST: string
@@ -47,7 +46,7 @@ class Client:
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.sock.settimeout(10)
         self.map = None
-        self.coordinates_queue = Queue()
+        self.commands_queue = Queue()
 
     def __del__(self):
         """
@@ -58,7 +57,6 @@ class Client:
     def connect(self):
         """
         Setting up the connection for the client to the server.
-
         Raises
         ------
         Exception
@@ -73,11 +71,9 @@ class Client:
         except:
             raise Exception("The client couldn't connect to the server!")
 
-
-    def send_command(self, command, robot=None):
+    def send_command(self, pickup, command, robot=None):
         """
         Sending a new command for the robot(s) through the server.
-
         Parameters
         ----------
         command: string
@@ -98,13 +94,13 @@ class Client:
                 except:
                     pass
 
-                if robot==None:
+                if robot == None:
                     print("Trying to send a new command (" + str(command) + ") to all robots")
                 else:
                     print("Trying to send a new command (" + str(command) + ") to a robot at: " + str(robot))
                 try:
-                    self._set_command(command)
-                    self.sock.sendall(pickle.dumps((robot, self.coordinates_queue.get())))
+                    self._set_command(pickup, command)
+                    self.sock.sendall(pickle.dumps((robot, self.commands_queue.get())))
                 except:
                     print("Couldn't send to server, the server is probably disconnected.")
                     self.disconnect()
@@ -119,7 +115,6 @@ class Client:
     def activate_manual_mode(self, robot=None):
         """
         Activates manual mode for a robot(s), so it starts to only listing for commands from clients.
-
         Parameters
         ----------
         robot(=None): string
@@ -148,7 +143,6 @@ class Client:
     def deactivate_manual_mode(self, robot=None):
         """
         Deactivates manual mode for a robot(s), so it starts moving automatically.
-
         Parameters
         ----------
         robot(=None): string
@@ -182,23 +176,21 @@ class Client:
         self.sock.sendall(pickle.dumps((self.sock.getsockname(), "end")))
         self.sock.close()
 
-    def _set_command(self, command):
+    def _set_command(self, pickup, command):
         """
         Setting a new command for the robot(s) in the direction_queue.
-
         Parameters
         ----------
         command: string
             The new command for the robot(s).
         """
-        self.coordinates_queue.put(command)
+        self.commands_queue.put([pickup, command])
 
     def _update_robots_list(self):
         """
         Updates the robots list with help of of the _recv_robots function.
         """
         self.server_robots_list = self._recv_robots()
-
 
     def _recv_robots(self):
         """
@@ -222,8 +214,8 @@ class Client:
             print("Successfully received robot list from server!")
             return robotlist
         except:
-             print("Failed to receive robot list from server...")
-             return []
+            print("Failed to receive robot list from server...")
+            return []
 
     def _update_map(self):
         self.map = self._recv_map()
