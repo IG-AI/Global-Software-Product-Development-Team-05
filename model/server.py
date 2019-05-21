@@ -24,7 +24,7 @@ class Server:
     disconnect(self):
         Stops the server.
     """
-    def __init__(self, host=socket.gethostbyname(socket.gethostname()), port=2526):
+    def __init__(self, host=socket.gethostbyname(socket.gethostname()), port=2241):
         """
         Initialize the server class, with a host and port as optional input.
 
@@ -259,10 +259,6 @@ class Server:
 
         return index
 
-    def _createCommand(self, robot): # - TODO: Create AI
-        self.commands_list[len(self.commands_list) - 1][0] = robot
-        self.commands_list[len(self.commands_list) - 1][1] = (5, 4) #This should be calculated.
-
     def _listen_robot(self, robotsocket, address):
         """
         Function for listing to a robot. It continues until either the server is shutting down or the current robot has
@@ -283,6 +279,7 @@ class Server:
         sentStopFlag = None
         new_grid_layout = ai.init_grid_layout(self.map.height, self.map.width)
         new_grid_layout = ai.init_robot_start_position(new_grid_layout, len(self.robots), (0,0, "north"), self.map.width)
+        command = [0, None]
         while self.RUN:
             sleep(1)
             try:
@@ -314,25 +311,42 @@ class Server:
 
             index = self._find_commands_queue(address)
 
-            print("Test: " + str(self.commands_list))
-            if self.commands_list[index][1].empty():
-                self._createCommand(address)
+            if command[1] == None:
+                command[1] = True
+                command[0] = False
 
-            command = self.commands_list[index].pop(1)
-            print(new_grid_layout)
-            direction, robotNextPosition, new_grid_layout, goalPosition = ai.next_action_and_position_and_grid_update(self.map.width, self.map.height, new_grid_layout, command, pickup_flag, len(self.robots))
+            elif command[1] == False:
+                command[1] = True
+                command[0] = False
+            else:
+                command[1] = False
+                command[0] = (0,0)
+
+            if not self.commands_list[index][1].empty():
+                command = self.commands_list[index].pop(1)
+
+            next_action, robotNextPosition, new_grid_layout, goalPosition = ai.next_action_and_position_and_grid_update(self.map.width, self.map.height, new_grid_layout, command[0], command[1], len(self.robots))
+            print("command ", command)
+
             X, Y, direction = robotNextPosition
             self.current_layout = new_grid_layout
             self.robots[self._find_robot(address)][1] = (X, Y)
             self.robots[self._find_robot(address)][2] = direction
-            while direction != "goal":
-                    robotsocket.sendall(pickle.dumps(direction))
-                    print("Successfully sent a direction (" + str(direction) + ") to a robot at: " + str(address))
-                    direction, robotNextPosition, new_grid_layout, goalPosition = ai.next_action_and_position_and_grid_update(self.map.width, self.map.height, self.current_layout, command[1], command[0], len(self.robots))
-                    X, Y, direction = robotNextPosition
-                    self.current_layout = new_grid_layout
-                    self.robots[self._find_robot(address)][1] = (X, Y)
-                    self.robots[self._find_robot(address)][2] = direction
+            robotsocket.sendall(pickle.dumps(next_action))
+            while (next_action != "pickup") & (next_action != "dropoff"):
+                try:
+                    done = pickle.loads(robotsocket.recv(4096))
+                    if done == "done":
+                        sleep(1)
+                        print("Successfully sent a direction (" + str(next_action) + ") to a robot at: " + str(address))
+                        next_action, robotNextPosition, new_grid_layout, goalPosition = ai.next_action_and_position_and_grid_update(self.map.width, self.map.height, self.current_layout, goalPosition, command[1], len(self.robots))
+                        X, Y, direction = robotNextPosition
+                        self.current_layout = new_grid_layout
+                        self.robots[self._find_robot(address)][1] = (X, Y)
+                        self.robots[self._find_robot(address)][2] = direction
+                        robotsocket.sendall(pickle.dumps(next_action))
+                except:
+                    pass
 
         index = self._find_commands_queue(address)
         self.commands_list.pop(index)
