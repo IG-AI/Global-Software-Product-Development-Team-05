@@ -23,6 +23,15 @@ def init_robot_start_position(grid_layout, robot_nr, robot_pos, grid_width):
   return updated_grid_layout
 
 
+def draw_grid(grid_layout, grid_width, grid_height):
+  for y in range(0, grid_height):
+    row = ""
+    for x in range(0, grid_width):
+      row = row + grid_layout[x + y * grid_width] + "  "
+
+    print(row)
+  print('-----')
+
 if __name__ == '__main__':
   # INIT
   # Position robot automatically moves back to after drop-off
@@ -61,6 +70,9 @@ if __name__ == '__main__':
           goalPosition = robots_goal_positions[robot_to_move]
 
         (nextAction, robotNextPosition, grid_layout, goalPosition) = AI.next_action_and_position_and_grid_update(grid_width, grid_height, grid_layout, goalPosition, robots_drop_off_states[robot_to_move], robot_to_move)
+        print('!!!!!!!!')
+        draw_grid(grid_layout, grid_width, grid_height)
+
         print('nextAction', nextAction)
         print()
         print('##################')
@@ -72,8 +84,9 @@ if __name__ == '__main__':
           robots_drop_off_states[robot_to_move] = True
         else:
           robots_goal_positions[robot_to_move] = goalPosition
-        robots_ready[robot_to_move] = False
+
+        # robots_ready[robot_to_move] = False
 
 
 
-    time.sleep(0.02)
+    time.sleep(0.1)
