@@ -1,4 +1,3 @@
-
 from queue import Queue
 from time import sleep
 import socket, pickle, _thread
@@ -7,6 +6,7 @@ import util.aiPlacement as ai
 class Server:
     """
     A class which acts as a server. It connects and handles data between clients, robots and a camera.
+
     Methods
     -------
     connect(self):
@@ -24,15 +24,17 @@ class Server:
     disconnect(self):
         Stops the server.
     """
-    def __init__(self, host=socket.gethostbyname(socket.gethostname()), port=2526):
+    def __init__(self, host=socket.gethostbyname(socket.gethostname()), port=2241):
         """
         Initialize the server class, with a host and port as optional input.
+
         Parameters
         ----------
         host(='127.0.1.1'): string
             A string with the IP address for which the server should use.
         port(=2526): int
             A port number the server server should use.
+
         Attributes
         ----------
         RUN: bool
@@ -86,6 +88,7 @@ class Server:
     def _connectAux(self):
         """
         Aux function for the connection function, which starts new threads with new incoming connections.
+
         Attributes
         ----------
         sock: socket
@@ -94,6 +97,7 @@ class Server:
             IP address for the connected component.
         id : vary (string)
             ID if the connection in the form of a string, which can have either the value of robot, client or camera.
+
         Raises
         ------
         Exception
@@ -130,6 +134,7 @@ class Server:
     def set_map(self, map):
         """
         Sets the map over the building the robot(s) should operate in.
+
         Parameters
         ----------
         map: matrix
@@ -152,6 +157,7 @@ class Server:
     def start_robot(self, robot, time=None):
         """
         Starts a robot in a new thread, with the duration in seconds as a optional input (time).
+
         Parameters
         ----------
         robot: (string, int)
@@ -166,6 +172,7 @@ class Server:
         """
         Starts a specific robot as given in the input. A second parameter is optional, if left then the robot continues
         until a stop_robot(robot) has been called. If given as a an int, the robot will run for that amount of time.
+
         Parameters
         ----------
         robot: (string, int)
@@ -173,6 +180,7 @@ class Server:
         time(=None): int
             A optional input, if left the robot will continue until it receives a stop call. Otherwise ot will
             continue equal amout of time as set in the input or until receives a stop call.
+
         Raises
         ------
         Exception
@@ -200,6 +208,7 @@ class Server:
     def stop_robot(self, robot):
         """
         Stops a specific robot as given in the input.
+
         Parameters
         ----------
         robot: (string, int)
@@ -223,6 +232,7 @@ class Server:
     def _find_commands_queue(self, address):
         """
         Finds a unique commands queue for a specific robot.
+
         Parameters
         ----------
         address: string
@@ -237,6 +247,7 @@ class Server:
     def _find_robot(self, robot):
         """
         Finds a robot in the robot list.
+
         Parameters
         ----------
         address: string
@@ -248,14 +259,11 @@ class Server:
 
         return index
 
-    def _createCommand(self, robot): # - TODO: Create AI
-        self.commands_list[len(self.commands_list) - 1][0] = robot
-        self.commands_list[len(self.commands_list) - 1][1] = (5, 4) #This should be calculated.
-
     def _listen_robot(self, robotsocket, address):
         """
         Function for listing to a robot. It continues until either the server is shutting down or the current robot has
         shut down.
+
         Parameters
         ----------
         robotsocket: socket
@@ -271,6 +279,7 @@ class Server:
         sentStopFlag = None
         new_grid_layout = ai.init_grid_layout(self.map.height, self.map.width)
         new_grid_layout = ai.init_robot_start_position(new_grid_layout, len(self.robots), (0,0, "north"), self.map.width)
+        command = [0, None]
         while self.RUN:
             sleep(1)
             try:
@@ -302,25 +311,42 @@ class Server:
 
             index = self._find_commands_queue(address)
 
-            print("Test: " + str(self.commands_list))
-            if self.commands_list[index][1].empty():
-                self._createCommand(address)
+            if command[1] == None:
+                command[1] = True
+                command[0] = False
 
-            command = self.commands_list[index].pop(1)
-            print(new_grid_layout)
-            direction, robotNextPosition, new_grid_layout, goalPosition = ai.next_action_and_position_and_grid_update(self.map.width, self.map.height, new_grid_layout, command[1], command[0], len(self.robots))
+            elif command[1] == False:
+                command[1] = True
+                command[0] = False
+            else:
+                command[1] = False
+                command[0] = (0,0)
+
+            if not self.commands_list[index][1].empty():
+                command = self.commands_list[index].pop(1)
+
+            next_action, robotNextPosition, new_grid_layout, goalPosition = ai.next_action_and_position_and_grid_update(self.map.width, self.map.height, new_grid_layout, command[0], command[1], len(self.robots))
+            print("command ", command)
+
             X, Y, direction = robotNextPosition
             self.current_layout = new_grid_layout
             self.robots[self._find_robot(address)][1] = (X, Y)
             self.robots[self._find_robot(address)][2] = direction
-            while direction != "goal":
-                    robotsocket.sendall(pickle.dumps(direction))
-                    print("Successfully sent a direction (" + str(direction) + ") to a robot at: " + str(address))
-                    direction, robotNextPosition, new_grid_layout, goalPosition = ai.next_action_and_position_and_grid_update(self.map.width, self.map.height, self.current_layout, command[1], command[0], len(self.robots))
-                    X, Y, direction = robotNextPosition
-                    self.current_layout = new_grid_layout
-                    self.robots[self._find_robot(address)][1] = (X, Y)
-                    self.robots[self._find_robot(address)][2] = direction
+            robotsocket.sendall(pickle.dumps(next_action))
+            while (next_action != "pickup") & (next_action != "dropoff"):
+                try:
+                    done = pickle.loads(robotsocket.recv(4096))
+                    if done == "done":
+                        sleep(1)
+                        print("Successfully sent a direction (" + str(next_action) + ") to a robot at: " + str(address))
+                        next_action, robotNextPosition, new_grid_layout, goalPosition = ai.next_action_and_position_and_grid_update(self.map.width, self.map.height, self.current_layout, goalPosition, command[1], len(self.robots))
+                        X, Y, direction = robotNextPosition
+                        self.current_layout = new_grid_layout
+                        self.robots[self._find_robot(address)][1] = (X, Y)
+                        self.robots[self._find_robot(address)][2] = direction
+                        robotsocket.sendall(pickle.dumps(next_action))
+                except:
+                    pass
 
         index = self._find_commands_queue(address)
         self.commands_list.pop(index)
@@ -339,6 +365,7 @@ class Server:
         """
         Function for listing to a client. It continues until either the server is shutting down or the current client
         has shut down.
+
         Parameters
         ----------
         clientsocket: socket
@@ -423,6 +450,7 @@ class Server:
         """
         Function for listing to the camera. It continues until either the server is shutting down or the camera has
         shut down.
+
         Parameters
         ----------
         camerasocket: socket
@@ -440,3 +468,4 @@ class Server:
 
         print("Disconnecting the camera...")
         camerasocket.sendall(pickle.dumps("end"))
+
