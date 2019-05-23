@@ -1,0 +1,487 @@
+# !/usr/bin/env python3
+from ev3dev2.motor import MediumMotor, LargeMotor, OUTPUT_A, OUTPUT_B, OUTPUT_C, MoveSteering, SpeedPercent, MoveTank
+from ev3dev2.sensor import INPUT_1
+from ev3dev2.sensor.lego import ColorSensor
+from ev3dev2.sound import Sound
+
+import socket, pickle, _thread, serial
+from queue import Queue
+from time import sleep
+from model.peer import Peer
+
+
+class Robot(Peer):
+    """
+    A class which handles a LEGO robot. It can connect to a server and receive commands form the server.
+    Methods
+    -------
+    connect(self):
+        Connects the robot to the server.
+    recv(self, command):
+        Tries to receive a command form the server.
+    start(self):
+        Function that starts the robot in a new thread.
+    stop(self):
+        Function that stops the robot.
+    turn_cardinal(self, direction):
+        Turns the robot 90 degrees, either to left or right based on the input which should be left or right.
+    run(self, speed=64):
+        Starts the motors, with the speed as the input, as the default 64.
+    start(self):
+        Function that starts the robot in a new thread.
+    brake(self):
+        Stops the robots motors.
+    disconnect(self)
+        Disconnects the robot to the server.
+
+    Author: Daniel Ågstrand
+
+    Tested and calibrated by Daniel Ågstrand and Patrik Larsson
+    """
+
+    def __init__(self, current_location_x=0, current_location_y=0, current_direction="north", server_ip='127.0.1.1', server_port=2526):
+        """
+        Initialize the robot class, with a server_ip and server_port as optional input.
+        Parameters
+        ----------
+        server_ip(='127.0.1.1'): string
+            A string with the IP address to the server.
+        server_port(=2526): int
+            A server_port number to the server.
+        Attributes
+        ----------
+        server_host: string
+            The servers server_ip address.
+        server_port : int
+            The servers server_port number.
+        MANUAL: boolean
+            Flag that's indicates if the robot is in manual mode.
+        RUN: bollean
+            Flag that's indicates if the robot is running.
+        brick: brick
+            The LEGO brick object.
+        left_motor: Motor
+            Motor object that controls the left motor of the robot.
+        right_motor: Motor
+            Motor object that controls the right motor of the robot.
+        light_sensor: Color20
+            Light sensor object for the robot.
+        direction_queue : Queue
+            A queue with coordinate the robot should move_to_coords towards.
+        """
+        super(Robot, self).__init__(server_ip, server_port)
+        self.MANUAL = False
+        self.RUN = False
+        self.PICKUP = True
+        self.wheels_motor = MoveSteering(OUTPUT_A, OUTPUT_B)
+        self.arm_motor = MediumMotor(OUTPUT_C)
+        self.color_sensor = ColorSensor(INPUT_1)
+        self.color_sensor.mode = "RGB-RAW"
+        self.speaker = Sound()
+        self.current_location_x = current_location_x
+        self.current_location_y = current_location_y
+        self.assign_coordinate(current_location_x, current_location_y, current_direction)
+        self.direction_queue = Queue()
+
+    def __del__(self):
+        """
+        Disconnects the robot if the robot object is removed.
+        """
+        self.sock.close()
+
+    def connect(self):
+        """
+        Setting up the connection for the robot to the server.
+        Raises
+        ------
+        Exception
+            If the robot can't connect to the server, Exception is raised.
+        """
+        try:
+            print("Connecting to server on IP: " + str(self.server_ip) + " and port: " + str(self.server_port))
+            self.sock.connect((self.server_ip, self.server_port))
+            self.sock.sendall(pickle.dumps('robot'))
+            self.RUN = True
+
+            self.recv(1)
+        except:
+            raise Exception("The robot couldn't connect to the server!")
+
+    def recv(self, amount=None):
+        """
+        Tries to receive commands form the server. If input leaves emtpy it will continue until it gets a end call
+        from the server. Otherwise it will receive the same amount of commands as the input.
+        Parameters
+        ----------
+        amount(=None): int
+            The amount of commands that should be received before the function should end. Of left empty, then it will
+            continue until the robot receives a end call from the server.
+        Raises
+        ------
+        Exception:
+            If input isn't None or an int, Exception is raised.
+        """
+        if (type(amount) == int) | (amount == None):
+            if amount == None:
+                while True:
+                    self._recv_aux()
+            else:
+                for i in range(amount):
+                    self._recv_aux()
+        else:
+            raise Exception("Invalid input! Input has to be an int.")
+
+    def _recv_aux(self):
+        """
+        Aux function to the recv function.
+        """
+        try:
+            print("Trying to receive a new command from server...")
+            data = pickle.loads(self.sock.recv(4096))
+            if data == "end":
+                self.RUN = False
+                self.disconnect()
+                return
+            elif data == "manual":
+                print("Manual Mode activated!")
+                self.MANUAL = True
+            elif data == "auto":
+                print("Auto Mode activated!")
+                self.MANUAL = False
+            elif data == "start":
+                print("Robot started!")
+                _thread.start_new_thread(self._start_aux(), ())
+            elif data == "stop":
+                print("Robot stopped!")
+                self.stop()
+            else:
+                print("Successfully received a direction from the server! (" + str(data) + ")")
+                self.direction_queue.put(data)
+                return
+        except:
+            print("Failed to receive command from server!")
+            pass
+
+    def start(self):
+        """
+        Function that starts the robot in a new thread.
+        """
+        _thread.start_new_thread(self._start_aux(), ())
+
+    def _start_aux(self):
+        """
+        Aux function to the start function.
+        """
+        self.speaker.speak("Go Go Gadget!")
+        self.RUN = True
+        while self.RUN:
+            self.recv(1)
+            self.move()
+
+            self.sock.sendall(pickle.dumps("done"))
+
+        self.recv(1)
+
+    def stop(self):
+        """
+        Function that stops the robot.
+        """
+        self.speaker.speak("Bye Bye Bitchers!")
+        self.RUN = False
+
+    def turn_cardinal(self, direction):
+        """
+        Turns the robot 90 degrees, either to left or right based on the input.
+        Parameters
+        ----------
+        direction: string
+            The cardinal direction the robot should face.
+        Raises
+        ------
+            Exception:
+                If the input isn't either east, west, north or south, Exception is raised.
+        """
+        if (direction == "west") | (direction == "east") | (direction == "north") | (direction == "south"):
+            if self.current_direction != direction:
+                if self.current_direction == "west":
+                    if direction == "east":
+                        self.wheels_motor.on_for_rotations(100, SpeedPercent(25), 180)
+                    elif direction == "north":
+                        self.wheels_motor.on_for_rotations(100, SpeedPercent(25), 90)
+                    elif direction == "south":
+                        self.wheels_motor.on_for_rotations(-100, SpeedPercent(25), 90)
+
+                elif self.current_direction == "east":
+                    if direction == "west":
+                        self.wheels_motor.on_for_rotations(-100, SpeedPercent(25), 180)
+                    elif direction == "north":
+                        self.wheels_motor.on_for_rotations(-100, SpeedPercent(25), 90)
+                    elif direction == "south":
+                        self.wheels_motor.on_for_rotations(100, SpeedPercent(25), 90)
+
+                elif self.current_direction == "north":
+                    if direction == "west":
+                        self.wheels_motor.on_for_rotations(-100, SpeedPercent(25), 90)
+                    elif direction == "east":
+                        self.wheels_motor.on_for_rotations(100, SpeedPercent(25), 90)
+                    elif direction == "south":
+                        self.wheels_motor.on_for_rotations(100, SpeedPercent(25), 180)
+
+                elif self.current_direction == "south":
+                    if direction == "west":
+                        self.wheels_motor.on_for_rotations(-100, SpeedPercent(25), 90)
+                    elif direction == "east":
+                        self.wheels_motor.on_for_rotations(100, SpeedPercent(25), 90)
+                    elif direction == "north":
+                        self.wheels_motor.on_for_rotations(100, SpeedPercent(25), 180)
+
+                self.current_direction = direction
+            else:
+                pass
+        else:
+            raise Exception("The direction has to be a string with either west, east, north and south!")
+
+    def run(self, speed=25):
+        """
+        Starts the motors, with the speed as the input, as the default 25
+        Parameters
+        ----------
+        speed (=64): int
+            The speed the robot should run in.
+        Raises
+        ------
+        Exception:
+            If the input isn't an int, Exception is raised.
+        """
+        if type(speed) is int:
+            self.wheels_motor.on(steering=0, speed=speed)
+            while True:
+                red = self.color_sensor.value(0)
+                green = self.color_sensor.value(1)
+                blue = self.color_sensor.value(2)
+                if (red > 50 and green in range(0, 50) and blue in range(0, 50)):
+                    print('RED')
+                    break
+            sleep(0.5)
+            self.brake()
+
+        else:
+            raise Exception("The speed has to be an int!")
+
+    def back(self, speed=25):
+        """
+        Starts the motors in reverse, with the speed as the input, as the default 25
+        Parameters
+        ----------
+        speed(=25): int
+            The speed the robot should run in.
+        Raises
+        ------
+        Exception:
+            If the input isn't an int, Exception is raised.
+        """
+        if type(speed) is int:
+            self.wheels_motor.on(steering=0, speed=-speed)
+            while True:
+                red = self.color_sensor.value(0)
+                green = self.color_sensor.value(1)
+                blue = self.color_sensor.value(2)
+                if (red > 50 and green in range(0, 50) and blue in range(0, 50)):
+                    print('RED')
+                    break
+            sleep(0.5)
+            self.brake()
+
+        else:
+            raise Exception("The speed has to be an int!")
+
+    def brake(self):
+        """
+        Breaks the robots movement.
+        """
+        self.wheels_motor.stop()
+
+    def lift_arm(self):
+        """
+        Lifts the robots arm
+        """
+        self.arm_motor.on_for_seconds(speed=5, seconds=1)
+
+    def lower_arm(self):
+        self.arm_motor.on_for_seconds(speed=-5, seconds=1)
+
+    def disconnect(self):
+        """
+        Closing down the connection between the robot and the server.
+        """
+        print("Robot disconnecting...")
+        self.sock.sendall(pickle.dumps("end"))
+        sleep(1)
+        self.sock.close()
+
+    def move(self):
+        """
+        Moves the robot sequentially, one cell at the time until i
+
+        Raises
+        ------
+        Exception:
+            If the command isn't in the format (x, y), Exception is raised.
+
+        Returns
+        -------
+        not_move if no directions are available, otherwise it doesn't return anything.
+        """
+        try:
+            direction = self.direction_queue.get()
+        except:
+            print("No directions available!")
+            return "not_move"
+
+        if direction == "pickup":
+            print("Robot reached it destination!")
+            self.lift_arm()
+        elif direction == "dropoff":
+            print("Robot reached it destination!")
+            self.lower_arm()
+
+        elif direction == "forward":
+            self.run()
+
+        elif direction == "backward":
+            self.back()
+
+        elif direction == "right":
+            if self.current_direction == "north":
+                self.current_direction = "east"
+            elif self.current_direction == "south":
+                self.current_direction = "west"
+            elif self.current_direction == "west":
+                self.current_direction = "north"
+            elif self.current_direction == "east":
+                self.current_direction = "south"
+            self.wheels_motor.on_for_degrees(steering=100, speed=25, degrees=200)
+
+        elif direction == "left":
+            if self.current_direction == "north":
+                self.current_direction = "west"
+            elif self.current_direction == "south":
+                self.current_direction = "east"
+            elif self.current_direction == "west":
+                self.current_direction = "south"
+            elif self.current_direction == "east":
+                self.current_direction = "north"
+            self.wheels_motor.on_for_degrees(steering=-100, speed=25, degrees=200)
+
+        elif direction == False:
+            print("No no path to the goal could be calculated!")
+
+        else:
+            raise Exception("The direction in move() has to be either, goal, forward, backward, right or left!")
+
+        self.sock.sendall(pickle.dumps(["pos", (self.current_location_x, self.current_location_y)]))
+
+    def move_to_coords(self, coordinate):
+        """
+        Moves the robot to the first coordinate in the direction_queue, if it's empty and manual mode isn't activated
+        then it automatic creates a new command.
+
+        Parameters
+        ----------
+        coordinate: Tuple
+            Coordinate to which the robot should move to, if left empty the robots moves to the first coordinate in the
+            coordinate queue. It the queue is empty, the robot will automatic create a new coordinate.
+
+        Raises
+        ------
+        Exception:
+            If the command isn't in the format (x, y), Exception is raised.
+        Exception:
+            If the input isn't in the format (x, y) or None, Exception is raised.
+        """
+        try:
+            X, Y = coordinate
+        except:
+            raise Exception("Wrong format of the input coordinates!")
+
+        print("The robot has started to move_to_coords to: (" + X + ", " + Y + ")")
+
+        if self.current_location_x < X:
+            self.turn_cardinal("east")
+        else:
+            self.turn_cardinal("west")
+
+        self.run()
+        while (self.current_location_x != X):
+            self.run()
+            self._update_current_position(self.current_direction)
+
+        if self.current_location_y < Y:
+            self.turn_cardinal("south")
+        else:
+            self.turn_cardinal("north")
+
+        self.run()
+        while self.current_location_y != Y:
+            self.run()
+            self._update_current_position(self.current_direction)
+
+        print("Robot has reaches it's destination at: (" + X + ", " + Y + ")")
+
+    def _assign_coordinate(self, current_location_x, current_location_y, current_direction):
+        """
+        Assign a coordinate to the robot.
+
+        Parameters
+        ----------
+        current_location_x: int
+            The current x position
+        current_location_y: int
+            The current y position
+        current_direction: string
+            The current cardinal direction the robot is facing, should be either "north", "south", "west", "east"
+            and "center"
+        """
+        self.current_location_x = current_location_x
+        self.current_location_y = current_location_y
+        self.current_direction = current_direction
+
+    def _update_current_position(self, direction, forward=True):
+        """
+        Updates the coordinate for the robot.
+
+        Parameters
+        ----------
+        direction: string
+            A cardinal direction, should be either "north", "south", "west", "east" and "center"
+
+        Returns
+        ------
+        1
+        """
+        if forward:
+            if (direction == "north"):
+                self.current_location_y += 1
+            elif (direction == "east"):
+                self.current_location_x += 1
+            elif (direction == "south"):
+                self.current_location_y -= 1
+            elif (direction == "west"):
+                self.current_location_x -= 1
+            elif (direction == "center"):
+                {}
+            else:
+                return 1
+        else:
+            if (direction == "north"):
+                self.current_location_y -= 1
+            elif (direction == "east"):
+                self.current_location_x -= 1
+            elif (direction == "south"):
+                self.current_location_y += 1
+            elif (direction == "west"):
+                self.current_location_x += 1
+            elif (direction == "center"):
+                {}
+            else:
+                return 1
