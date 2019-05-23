@@ -3,7 +3,7 @@ import util.pathfinding as pf
 
 from model.server import Server
 
-server = Server(host="10.10.10.2")
+server = Server(server_ip="127.0.0.1", server_port=2526)
 server.connect()
 
 start, goal = (0, 0, 0, 1), (5, 4)
