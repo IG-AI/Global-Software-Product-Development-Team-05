@@ -1,7 +1,9 @@
 import time
 
-from speakLego.http_request import request
 from pathfinder.pathfinder import find_path
+
+from hanoi.speakLego import request
+
 
 def neuron(flag, map, flag_queue, map_queue):
     #flag = flag_queue.get()

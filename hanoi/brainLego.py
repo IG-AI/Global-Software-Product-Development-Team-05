@@ -1,8 +1,11 @@
-import threading, queue
+import queue
+import threading
 
-from hostLego import hear
 from neuronLego import neuron
-from speakLego.http_register import register
+
+from hanoi.hostLego import hear
+from hanoi.speakLego import register
+
 
 def func1(num, q):
     while num < 100000000:
